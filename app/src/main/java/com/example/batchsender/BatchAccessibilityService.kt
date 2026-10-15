@@ -4,11 +4,11 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
-import android.net.Uri
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
 
 class BatchAccessibilityService : AccessibilityService() {
@@ -16,7 +16,8 @@ class BatchAccessibilityService : AccessibilityService() {
         @Volatile private var instance: BatchAccessibilityService? = null
         private const val LAUNCH_DELAY = 1400L
         private const val SHARE_DELAY = 1800L
-        private const val SEND_TIMEOUT = 120_000L
+        private const val GENERATION_TIMEOUT = 120_000L
+        private const val DOWNLOAD_WAIT = 5000L
         private const val NEXT_DELAY = 2500L
 
         fun startQueue(context: android.content.Context, jobs: List<BatchController.Job>): Boolean {
@@ -27,7 +28,9 @@ class BatchAccessibilityService : AccessibilityService() {
         }
     }
 
-    private enum class State { IDLE, LAUNCHING, SHARING, WAITING_FOR_COMPLETION }
+    private enum class State {
+        IDLE, LAUNCHING, SHARING, WAITING_FOR_COMPLETION, DOWNLOADING
+    }
 
     private val handler = Handler(Looper.getMainLooper())
     private var jobs: List<BatchController.Job> = emptyList()
@@ -36,6 +39,7 @@ class BatchAccessibilityService : AccessibilityService() {
     private var sentAt = 0L
     private var sendClicked = false
     private var generationIndicatorSeen = false
+    private var downloadClicked = false
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -48,39 +52,18 @@ class BatchAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
-    override fun onInterrupt() {
-        stopQueue()
-    }
+    override fun onInterrupt() = stopQueue()
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val job = jobs.getOrNull(index) ?: return
-        if (state != State.SHARING && state != State.WAITING_FOR_COMPLETION) return
-        if (event?.packageName?.toString() != job.destination.packageName) return
+        val packageName = event?.packageName?.toString()
+        if (packageName != null && packageName != job.destination.packageName) return
 
         val root = rootInActiveWindow ?: return
         when (state) {
-            State.SHARING -> {
-                val stop = findAction(root, listOf("Stop generating", "Stop", "توقف"))
-                if (stop != null) generationIndicatorSeen = true
-
-                if (!sendClicked) {
-                    val send = findAction(root, listOf("Send", "ارسال", "Submit"))
-                    if (send != null && isLikelyEnabled(send)) {
-                        handler.postDelayed({ click(send) }, 350)
-                    }
-                }
-            }
-            State.WAITING_FOR_COMPLETION -> {
-                val stop = findAction(root, listOf("Stop generating", "Stop", "توقف"))
-                if (stop != null) generationIndicatorSeen = true
-
-                val elapsed = System.currentTimeMillis() - sentAt
-                if (generationIndicatorSeen && stop == null && elapsed > 2500L) {
-                    finishCurrent()
-                } else if (!generationIndicatorSeen && elapsed > SEND_TIMEOUT) {
-                    finishCurrent()
-                }
-            }
+            State.SHARING -> handleSharing(root, job)
+            State.WAITING_FOR_COMPLETION -> handleGeneration(root)
+            State.DOWNLOADING -> Unit
             else -> Unit
         }
     }
@@ -94,14 +77,12 @@ class BatchAccessibilityService : AccessibilityService() {
     }
 
     private fun launchCurrent() {
-        val job = jobs.getOrNull(index) ?: run {
-            stopQueue()
-            return
-        }
+        val job = jobs.getOrNull(index) ?: run { stopQueue(); return }
 
         state = State.LAUNCHING
         sendClicked = false
         generationIndicatorSeen = false
+        downloadClicked = false
 
         try {
             val launch = packageManager.getLaunchIntentForPackage(job.destination.packageName)
@@ -109,7 +90,7 @@ class BatchAccessibilityService : AccessibilityService() {
             launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             startActivity(launch)
         } catch (_: Exception) {
-            Toast.makeText(this, "مقصد ${index + 1} قابل اجرا نیست.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "مقصد ${index + 1} قابل اجرا نیست؛ می‌روم سراغ بعدی.", Toast.LENGTH_LONG).show()
             scheduleNext()
             return
         }
@@ -125,7 +106,7 @@ class BatchAccessibilityService : AccessibilityService() {
             type = "image/*"
             putExtra(Intent.EXTRA_STREAM, job.image)
             putExtra(Intent.EXTRA_TEXT, job.prompt)
-            putExtra(Intent.EXTRA_TITLE, "Batch Sender")
+            putExtra(Intent.EXTRA_TITLE, "ChatGPT Multi Batch")
             clipData = ClipData.newRawUri("image", job.image)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -135,35 +116,104 @@ class BatchAccessibilityService : AccessibilityService() {
         try {
             startActivity(share)
         } catch (_: Exception) {
-            // Some web apps do not expose ACTION_SEND. Keep the destination open so
-            // the accessibility layer can still interact with its UI.
-            handler.postDelayed({ tryAccessibilityFallback(job) }, SHARE_DELAY)
-            return
+            // If the wrapper does not implement ACTION_SEND, leave it open and
+            // let Accessibility try to fill the composer and press Send.
         }
 
-        handler.postDelayed({ tryAccessibilityFallback(job) }, SHARE_DELAY)
+        handler.postDelayed({
+            if (jobs.getOrNull(index) === job && state == State.SHARING) {
+                handleSharing(rootInActiveWindow, job)
+            }
+        }, SHARE_DELAY)
     }
 
-    private fun tryAccessibilityFallback(job: BatchController.Job) {
-        if (jobs.getOrNull(index) != job || state != State.SHARING) return
-        val root = rootInActiveWindow ?: return
-        val send = findAction(root, listOf("Send", "ارسال", "Submit"))
-        if (send != null && isLikelyEnabled(send) && !sendClicked) {
-            click(send)
+    private fun handleSharing(root: AccessibilityNodeInfo?, job: BatchController.Job) {
+        if (root == null || sendClicked) return
+
+        // EXTRA_TEXT is not honored by every Web App wrapper, so explicitly fill
+        // the first editable composer when it is empty or different from the job prompt.
+        val editor = findEditable(root)
+        if (editor != null && isLikelyEnabled(editor)) {
+            val current = editor.text?.toString().orEmpty()
+            if (current != job.prompt) {
+                val args = Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, job.prompt)
+                }
+                editor.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+            }
         }
+
+        val stop = findAction(root, listOf("Stop generating", "Stop", "توقف", "در حال تولید"))
+        if (stop != null) generationIndicatorSeen = true
+
+        val send = findAction(root, listOf("Send", "ارسال", "Submit", "فرستادن"))
+        if (send != null && isLikelyEnabled(send)) clickSend(send)
     }
 
-    private fun click(node: AccessibilityNodeInfo) {
+    private fun clickSend(node: AccessibilityNodeInfo) {
         if (sendClicked) return
         sendClicked = true
         node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         state = State.WAITING_FOR_COMPLETION
         sentAt = System.currentTimeMillis()
-        handler.postDelayed({
-            if (state == State.WAITING_FOR_COMPLETION && System.currentTimeMillis() - sentAt >= SEND_TIMEOUT) {
-                finishCurrent()
+        handler.postDelayed({ checkGenerationTimeout() }, GENERATION_TIMEOUT + 500L)
+    }
+
+    private fun handleGeneration(root: AccessibilityNodeInfo) {
+        val stop = findAction(root, listOf("Stop generating", "Stop", "توقف", "در حال تولید"))
+        if (stop != null) generationIndicatorSeen = true
+
+        // As soon as generation is over, prefer the real Download action.
+        if (generationIndicatorSeen && stop == null) {
+            val download = findAction(root, listOf(
+                "Download", "دانلود", "Download image", "دانلود تصویر",
+                "Save", "ذخیره", "Save image", "ذخیره تصویر"
+            ))
+            if (download != null && isLikelyEnabled(download)) {
+                clickDownload(download)
+                return
             }
-        }, SEND_TIMEOUT + 3000L)
+        }
+
+        // Some wrappers do not expose a readable generation indicator. After a
+        // short minimum wait, still look for Download before using the hard timeout.
+        val elapsed = System.currentTimeMillis() - sentAt
+        if (!generationIndicatorSeen && elapsed >= 30_000L) {
+            val download = findAction(root, listOf(
+                "Download", "دانلود", "Download image", "دانلود تصویر",
+                "Save", "ذخیره", "Save image", "ذخیره تصویر"
+            ))
+            if (download != null && isLikelyEnabled(download)) {
+                clickDownload(download)
+            }
+        }
+    }
+
+    private fun checkGenerationTimeout() {
+        if (state != State.WAITING_FOR_COMPLETION) return
+        val root = rootInActiveWindow
+        val download = root?.let {
+            findAction(it, listOf(
+                "Download", "دانلود", "Download image", "دانلود تصویر",
+                "Save", "ذخیره", "Save image", "ذخیره تصویر"
+            ))
+        }
+        if (download != null && isLikelyEnabled(download)) {
+            clickDownload(download)
+        } else {
+            Toast.makeText(this, "عملیات ${index + 1}: دکمه دانلود پیدا نشد؛ ادامه می‌دهم.", Toast.LENGTH_SHORT).show()
+            finishCurrent()
+        }
+    }
+
+    private fun clickDownload(node: AccessibilityNodeInfo) {
+        if (downloadClicked || state != State.WAITING_FOR_COMPLETION) return
+        downloadClicked = true
+        state = State.DOWNLOADING
+        node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        handler.postDelayed({
+            finishCurrent()
+        }, DOWNLOAD_WAIT)
     }
 
     private fun finishCurrent() {
@@ -171,6 +221,7 @@ class BatchAccessibilityService : AccessibilityService() {
         state = State.IDLE
         BatchController.advance()
         index++
+
         if (index >= jobs.size) {
             Toast.makeText(this, "همه ${jobs.size} عملیات تمام شد.", Toast.LENGTH_LONG).show()
             stopQueue()
@@ -192,26 +243,43 @@ class BatchAccessibilityService : AccessibilityService() {
         state = State.IDLE
         sendClicked = false
         generationIndicatorSeen = false
+        downloadClicked = false
         BatchController.clear()
+    }
+
+    private fun findEditable(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst()
+            if (node.isEditable && node.isVisibleToUser && node.isEnabled) return node
+            for (i in 0 until node.childCount) node.getChild(i)?.let(queue::addLast)
+        }
+        return null
     }
 
     private fun findAction(root: AccessibilityNodeInfo, labels: List<String>): AccessibilityNodeInfo? {
         for (label in labels) {
             root.findAccessibilityNodeInfosByText(label).firstOrNull()?.let { return it }
         }
+
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
         while (queue.isNotEmpty()) {
             val node = queue.removeFirst()
             val text = node.text?.toString().orEmpty()
             val desc = node.contentDescription?.toString().orEmpty()
-            if (labels.any { it.equals(text, true) || it.equals(desc, true) || text.contains(it, true) || desc.contains(it, true) }) {
-                return node
-            }
+            val viewId = node.viewIdResourceName.orEmpty()
+            if (labels.any {
+                    it.equals(text, true) || it.equals(desc, true) ||
+                    text.contains(it, true) || desc.contains(it, true) ||
+                    viewId.contains(it, true)
+                }) return node
             for (i in 0 until node.childCount) node.getChild(i)?.let(queue::addLast)
         }
         return null
     }
 
-    private fun isLikelyEnabled(node: AccessibilityNodeInfo): Boolean = node.isEnabled && node.isVisibleToUser
+    private fun isLikelyEnabled(node: AccessibilityNodeInfo): Boolean =
+        node.isEnabled && node.isVisibleToUser
 }
