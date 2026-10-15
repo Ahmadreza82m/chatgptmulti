@@ -1,0 +1,4 @@
+<resources>
+<string name="app_name">Batch Sender</string>
+<string name="accessibility_desc">Controls the selected destination apps to automate the batch workflow.</string>
+</resources>
