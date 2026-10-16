@@ -11,8 +11,29 @@ android {
         applicationId = "com.example.batchsender"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("MULTISEND_KEYSTORE_PATH")
+            val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+            val aliasPassword = System.getenv("KEY_ALIAS_PASSWORD")
+            if (!keystorePath.isNullOrBlank() && !keystorePassword.isNullOrBlank() && !aliasPassword.isNullOrBlank()) {
+                storeFile = file(keystorePath)
+                storePassword = keystorePassword
+                keyAlias = "multisendai"
+                keyPassword = aliasPassword
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+        }
     }
 
     compileOptions {
