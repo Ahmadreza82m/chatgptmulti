@@ -1,0 +1,4 @@
+playwright==1.55.0
+fastapi==0.117.1
+uvicorn[standard]==0.37.0
+python-multipart==0.0.20
