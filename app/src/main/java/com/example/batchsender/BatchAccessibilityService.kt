@@ -15,18 +15,19 @@ import android.widget.Toast
  * Concurrent batch dispatcher.
  *
  * Android AccessibilityService can only actively inspect/control the current
- * foreground window. Therefore this engine does not pretend that ten foreground
- * apps can be clicked literally at the same instant. Instead it starts each
- * destination quickly, lets generation continue independently in each app,
- * and then rotates through the running destinations to detect completion and
- * download results. One job failing never blocks the others.
+ * foreground window. The engine therefore starts each destination one-by-one
+ * as quickly as safely possible, immediately submits its job, and then lets
+ * all submitted destinations generate concurrently. A lightweight polling
+ * loop later rotates through the running destinations to download results.
  */
 class BatchAccessibilityService : AccessibilityService() {
     companion object {
         @Volatile private var instance: BatchAccessibilityService? = null
 
-        private const val START_GAP = 450L
-        private const val SHARE_DELAY = 1200L
+        // Keep the launched destination in the foreground long enough for its
+        // own ACTION_SEND + accessibility fallback to submit before moving on.
+        private const val START_GAP = 1500L
+        private const val SHARE_DELAY = 550L
         private const val POLL_INTERVAL = 1800L
         private const val GENERATION_TIMEOUT = 120_000L
         private const val DOWNLOAD_WAIT = 1800L
@@ -34,7 +35,7 @@ class BatchAccessibilityService : AccessibilityService() {
         fun startQueue(context: android.content.Context, jobs: List<BatchController.Job>): Boolean {
             val service = instance ?: return false
             service.begin(jobs)
-            Toast.makeText(context, "${jobs.size} عملیات به‌صورت همزمان شروع می‌شوند.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "${jobs.size} عملیات شروع می‌شوند و تولیدها همزمان ادامه پیدا می‌کنند.", Toast.LENGTH_SHORT).show()
             return true
         }
     }
@@ -91,15 +92,15 @@ class BatchAccessibilityService : AccessibilityService() {
         runtimeJobs = newJobs.map { RuntimeJob(it) }
         focusedIndex = -1
 
+        // Submit every destination quickly. Once a destination reaches
+        // GENERATING, the next destination starts without waiting for it.
         runtimeJobs.forEachIndexed { index, _ ->
             handler.postDelayed({ startJob(index) }, START_GAP * index)
         }
 
-        val totalStart = START_GAP * runtimeJobs.size + 1500L
-        handler.postDelayed({ pollRunningJobs() }, totalStart)
+        handler.postDelayed({ pollRunningJobs() }, START_GAP * runtimeJobs.size + 1200L)
     }
 
-    /** Start one destination, send its prompt/image, then immediately move on. */
     private fun startJob(index: Int) {
         if (stopped) return
         val runtime = runtimeJobs.getOrNull(index) ?: return
@@ -144,18 +145,18 @@ class BatchAccessibilityService : AccessibilityService() {
         }
 
         try {
+            // This foregrounds the exact destination immediately before the
+            // accessibility fallback searches for its editor/send controls.
             startActivity(share)
         } catch (_: Exception) {
-            // Some wrappers ignore ACTION_SEND. Accessibility fallback below.
+            // Wrapper may not expose ACTION_SEND; accessibility fallback below.
         }
 
         handler.postDelayed({
-            if (!stopped && !runtime.finished) {
-                handleSharing(rootInActiveWindow, runtime)
-                // Do not wait for this destination before starting the next one.
-                if (runtime.state == State.SHARING && !runtime.sendClicked) {
-                    failJob(index, "دکمه ارسال پیدا نشد")
-                }
+            if (stopped || runtime.finished) return@postDelayed
+            handleSharing(rootInActiveWindow, runtime)
+            if (runtime.state == State.SHARING && !runtime.sendClicked) {
+                failJob(index, "دکمه ارسال پیدا نشد")
             }
         }, SHARE_DELAY)
     }
@@ -220,10 +221,6 @@ class BatchAccessibilityService : AccessibilityService() {
         handler.postDelayed({ finishJob(runtime.job.index, true) }, DOWNLOAD_WAIT)
     }
 
-    /**
-     * Rotate through jobs which are already generating. This is the key change:
-     * generation is no longer held behind a single global index.
-     */
     private fun pollRunningJobs() {
         if (stopped) return
 
@@ -235,8 +232,7 @@ class BatchAccessibilityService : AccessibilityService() {
 
         val candidates = unfinished.filter { it.state == State.GENERATING }
         if (candidates.isEmpty()) {
-            if (runtimeJobs.all { it.finished }) completeBatch()
-            else handler.postDelayed({ pollRunningJobs() }, POLL_INTERVAL)
+            handler.postDelayed({ pollRunningJobs() }, POLL_INTERVAL)
             return
         }
 
@@ -284,7 +280,7 @@ class BatchAccessibilityService : AccessibilityService() {
         val runtime = runtimeJobs.getOrNull(index) ?: return
         if (runtime.finished) return
         runtime.finished = true
-        runtime.state = if (success) State.IDLE else State.IDLE
+        runtime.state = State.IDLE
         BatchController.setStatus(
             index,
             if (success) BatchController.JobStatus.COMPLETED else BatchController.JobStatus.FAILED
