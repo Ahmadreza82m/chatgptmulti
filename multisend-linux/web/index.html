@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>MultiSend Control Center</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <div class="eyebrow">MULTISEND AI</div>
+        <h1>Control Center</h1>
+        <p>پردازش موازی بدون جابه‌جایی اجباری بین اپ‌های گوشی</p>
+      </div>
+      <button id="stop" class="danger">⛔ توقف همه</button>
+    </header>
+
+    <section class="card">
+      <label>تصاویر</label>
+      <input id="images" type="file" accept="image/*" multiple>
+      <div id="preview" class="preview"></div>
+    </section>
+
+    <section class="card">
+      <label>پرامپت مشترک</label>
+      <textarea id="prompt" rows="5" placeholder="پرامپت را فقط یک بار وارد کنید..."></textarea>
+    </section>
+
+    <section class="card">
+      <label>Sessionها</label>
+      <input id="sessions" placeholder="account1, account2, account3">
+      <small>به ازای هر تصویر یک Session مستقل وارد کنید.</small>
+    </section>
+
+    <button id="start" class="primary">▶ شروع پردازش موازی</button>
+    <button id="reset" class="secondary">پاک‌کردن صف</button>
+
+    <section class="card">
+      <div class="section-title"><span>وضعیت عملیات</span><span id="count">0</span></div>
+      <div id="jobs" class="jobs"></div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
