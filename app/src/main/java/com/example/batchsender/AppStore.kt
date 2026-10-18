@@ -26,6 +26,7 @@ class AppStore(private val context: Context) {
     }
     private fun saveTasks(list: List<Task>) { val a = JSONArray(); list.forEach { t -> a.put(JSONObject().apply { put("id", t.id); put("batchId", t.batchId); put("name", t.name); put("inputUri", t.inputUri); put("prompt", t.prompt); put("connectionId", t.connectionId); put("status", t.status); put("outputUri", t.outputUri ?: ""); put("error", t.error); put("attempts", t.attempts) }) }; prefs.edit().putString("tasks", a.toString()).apply() }
     fun updateTask(id: String, update: (Task) -> Task) = synchronized(lock) { saveTasks(loadTasks().map { if (it.id == id) update(it) else it }) }
+    fun retryFailed() = synchronized(lock) { saveTasks(loadTasks().map { if (it.status == "FAILED") it.copy(status = "PENDING", error = "") else it }); prefs.edit().putBoolean("running", true).apply() }
 
     fun loadPrompt() = prefs.getString("last_prompt", "") ?: ""
     fun saveSelected(uris: List<Uri>) = prefs.edit().putString("selected", JSONArray(uris.map(Uri::toString)).toString()).apply()
