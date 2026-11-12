@@ -1,4 +1,4 @@
-name: Android Build
+name: Legacy Android Build
 on:
   push:
     branches: [ "main" ]
@@ -20,14 +20,14 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build release APK
+      - name: Build legacy OpenAI APK
         run: gradle --no-daemon clean assembleRelease
       - name: Verify APK exists
         run: test -s app/build/outputs/apk/release/app-release.apk
-      - name: Upload APK
+      - name: Upload legacy APK
         uses: actions/upload-artifact@v4
         with:
-          name: MultiSend-AI-release
+          name: MultiSend-Legacy-OpenAI-Android
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
