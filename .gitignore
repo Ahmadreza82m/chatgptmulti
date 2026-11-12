@@ -1,0 +1,7 @@
+# Local browser profiles and private data
+multisend-linux/sessions/
+multisend-linux/uploads/
+multisend-linux/outputs/
+multisend-linux/.venv/
+multisend-linux/__pycache__/
+*.pyc
