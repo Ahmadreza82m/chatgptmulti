@@ -1,47 +1,45 @@
 <!doctype html>
 <html lang="fa" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>MultiSend Control Center</title>
-  <link rel="stylesheet" href="/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MultiSend Gemini Manager</title>
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <main class="app">
-    <header>
-      <div>
-        <div class="eyebrow">MULTISEND AI</div>
-        <h1>Control Center</h1>
-        <p>پردازش موازی بدون جابه‌جایی اجباری بین اپ‌های گوشی</p>
-      </div>
-      <button id="stop" class="danger">⛔ توقف همه</button>
-    </header>
-
-    <section class="card">
-      <label>تصاویر</label>
-      <input id="images" type="file" accept="image/*" multiple>
-      <div id="preview" class="preview"></div>
-    </section>
-
-    <section class="card">
-      <label>پرامپت مشترک</label>
-      <textarea id="prompt" rows="5" placeholder="پرامپت را فقط یک بار وارد کنید..."></textarea>
-    </section>
-
-    <section class="card">
-      <label>Sessionها</label>
-      <input id="sessions" placeholder="account1, account2, account3">
-      <small>به ازای هر تصویر یک Session مستقل وارد کنید.</small>
-    </section>
-
-    <button id="start" class="primary">▶ شروع پردازش موازی</button>
-    <button id="reset" class="secondary">پاک‌کردن صف</button>
-
-    <section class="card">
-      <div class="section-title"><span>وضعیت عملیات</span><span id="count">0</span></div>
-      <div id="jobs" class="jobs"></div>
-    </section>
-  </main>
-  <script src="/app.js"></script>
+<main class="app">
+<header>
+  <div><div class="eyebrow">MULTISEND · GEMINI</div><h1>مدیریت چند حساب Gemini</h1><p>یک پرامپت مشترک، یک یا دو عکس اختصاصی برای هر حساب، ارسال مرحله‌ای</p></div>
+  <span class="brand-mark">G</span>
+</header>
+<section class="card">
+  <div class="section-title"><span>حساب‌های Google</span><span id="accountCount">۵ حساب</span></div>
+  <p class="hint">برای هر حساب یک‌بار پنجره ورود را باز کن و با حساب Google خودت وارد Gemini شو. ورود و تأیید هویت را خودت انجام می‌دهی.</p>
+  <div id="accounts" class="accounts"></div>
+  <button id="refreshAccounts" class="secondary">به‌روزرسانی وضعیت حساب‌ها</button>
+</section>
+<section class="card">
+  <label for="prompt">پرامپت مشترک</label>
+  <textarea id="prompt" rows="5" placeholder="پرامپت را فقط یک‌بار بنویس..."></textarea>
+  <small>همین متن برای تمام حساب‌های انتخاب‌شده ارسال می‌شود.</small>
+</section>
+<section class="card">
+  <div class="section-title"><span>تصاویر اختصاصی حساب‌ها</span><span class="hint">۱ یا ۲ عکس برای هر حساب</span></div>
+  <p class="hint">برای هر حساب، عکس اصلی و در صورت نیاز عکس ضمیمه را انتخاب کن. می‌توانی برای هر حساب عکس‌های متفاوتی داشته باشی.</p>
+  <div id="assignments" class="assignments"></div>
+</section>
+<section class="card">
+  <div class="section-title"><span>بازبینی ارسال</span><span id="selectedCount">۰ حساب</span></div>
+  <p class="hint">ارسال به‌صورت ترتیبی انجام می‌شود؛ هر حساب جداگانه پردازش می‌شود تا وضعیت و خطای هرکدام قابل پیگیری باشد.</p>
+  <button id="start" class="primary">▶ شروع ارسال به حساب‌ها</button>
+  <div class="controls"><button id="stop" class="danger">توقف صف</button><button id="reset" class="secondary">پاک‌کردن نتایج</button></div>
+</section>
+<section class="card">
+  <div class="section-title"><span>وضعیت ارسال‌ها</span><span id="jobCount">۰</span></div>
+  <div id="jobs" class="jobs"><p class="hint">هنوز ارسالی ثبت نشده است.</p></div>
+</section>
+<footer>بدون API Key · بدون واردکردن رمز در این برنامه · نشست‌های مرورگر روی همین دستگاه ذخیره می‌شوند.</footer>
+</main>
+<script src="/app.js"></script>
 </body>
 </html>

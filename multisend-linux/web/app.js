@@ -1,58 +1,21 @@
-const images = document.querySelector('#images');
-const preview = document.querySelector('#preview');
-const jobsEl = document.querySelector('#jobs');
-const count = document.querySelector('#count');
-const start = document.querySelector('#start');
-const stop = document.querySelector('#stop');
-const reset = document.querySelector('#reset');
-
-images.addEventListener('change', () => {
-  preview.innerHTML = '';
-  [...images.files].forEach(file => {
-    const img = document.createElement('img');
-    img.src = URL.createObjectURL(file);
-    preview.appendChild(img);
-  });
-});
-
-async function refresh() {
-  const res = await fetch('/api/jobs');
-  const jobs = await res.json();
-  count.textContent = jobs.length;
-  jobsEl.innerHTML = jobs.map(j => {
-    const cls = j.status === 'COMPLETED' ? 'ok' : j.status === 'FAILED' || j.status === 'CANCELLED' ? 'bad' : '';
-    return `<div class="job"><div class="jobline"><b>تصویر ${j.index + 1}</b><span class="status ${cls}">${j.status}</span></div><small>Session: ${j.session}</small>${j.error ? `<small class="bad">${j.error}</small>` : ''}</div>`;
-  }).join('');
-}
-
-start.addEventListener('click', async () => {
-  if (!images.files.length) return alert('حداقل یک تصویر انتخاب کنید.');
-  const prompt = document.querySelector('#prompt').value.trim();
-  const sessions = document.querySelector('#sessions').value.trim();
-  if (!prompt) return alert('پرامپت را وارد کنید.');
-  if (!sessions) return alert('Sessionها را وارد کنید.');
-  const form = new FormData();
-  form.append('prompt', prompt);
-  form.append('sessions', sessions);
-  [...images.files].forEach(file => form.append('images', file, file.name));
-  start.disabled = true;
-  try {
-    const res = await fetch('/api/batch', {method:'POST', body:form});
-    if (!res.ok) throw new Error(await res.text());
-  } catch (e) { alert('شروع ناموفق بود: ' + e.message); }
-  start.disabled = false;
-  refresh();
-});
-
-stop.addEventListener('click', async () => {
-  await fetch('/api/stop', {method:'POST'});
-  refresh();
-});
-
-reset.addEventListener('click', async () => {
-  await fetch('/api/reset', {method:'POST'});
-  refresh();
-});
-
-refresh();
-setInterval(refresh, 1500);
+const accountRoot=document.querySelector('#accounts');
+const assignmentRoot=document.querySelector('#assignments');
+const jobsRoot=document.querySelector('#jobs');
+const promptEl=document.querySelector('#prompt');
+const startBtn=document.querySelector('#start');
+let accounts=[];
+let selected={};
+const labels={QUEUED:'در صف',OPENING_ACCOUNT:'بازکردن حساب',WAITING_FOR_LOGIN:'در انتظار ورود',ATTACHING_IMAGES:'افزودن عکس‌ها',SENDING:'در حال ارسال',WAITING_FOR_RESULT:'در انتظار پاسخ',COMPLETED:'تکمیل شد',FAILED:'ناموفق',CANCELLED:'متوقف شد',VERIFY_IN_GEMINI:'نیازمند بررسی در Gemini'};
+async function api(url,options={}){const response=await fetch(url,options);const data=await response.json().catch(()=>({detail:response.statusText}));if(!response.ok)throw new Error(data.detail||'خطای ارتباط');return data;}
+function escapeHtml(value){return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+async function loadAccounts(){try{accounts=await api('/api/accounts');renderAccounts();renderAssignments();}catch(error){accountRoot.innerHTML='<p class="bad">ارتباط با سرویس برقرار نشد: '+escapeHtml(error.message)+'</p>';}}
+function renderAccounts(){accountRoot.innerHTML=accounts.map(a=>{const state=a.logged_in?'<span class="status ok">واردشده</span>':a.opened?'<span class="status warn">ورود لازم است</span>':'<span class="status">تنظیم نشده</span>';return '<div class="account"><div class="account-icon">G</div><div class="account-info"><b>'+escapeHtml(a.name)+'</b><small>'+state+'</small></div><button class="secondary compact" data-open="'+a.id+'">'+(a.opened?'بازکردن':'ورود / اتصال')+'</button></div>';}).join('');document.querySelector('#accountCount').textContent=accounts.length+' حساب';accountRoot.querySelectorAll('[data-open]').forEach(button=>button.addEventListener('click',async()=>{button.disabled=true;try{await api('/api/accounts/'+button.dataset.open+'/open',{method:'POST'});alert('پنجره Gemini باز شد. ورود Google را در همان پنجره کامل کن.');}catch(e){alert(e.message);}button.disabled=false;setTimeout(loadAccounts,1500);}));}
+function renderAssignments(){assignmentRoot.innerHTML=accounts.map(a=>{const current=selected[a.id]||[];const previews=current.map((file,j)=>'<div class="preview-item"><img src="'+URL.createObjectURL(file)+'" alt=""><span>'+(j===0?'عکس اصلی':'عکس ضمیمه')+'</span><button type="button" data-remove="'+a.id+'" data-index="'+j+'">×</button></div>').join('');return '<div class="assignment"><div class="assignment-head"><b>'+escapeHtml(a.name)+'</b><span class="hint">'+current.length+'/2 عکس</span></div><label class="file-pick">انتخاب عکس اصلی یا ضمیمه<input type="file" accept="image/*" multiple data-files="'+a.id+'"></label><div class="previews">'+previews+'</div></div>';}).join('');assignmentRoot.querySelectorAll('[data-files]').forEach(input=>input.addEventListener('change',()=>{selected[input.dataset.files]=[...input.files].slice(0,2);renderAssignments();}));assignmentRoot.querySelectorAll('[data-remove]').forEach(button=>button.addEventListener('click',()=>{selected[button.dataset.remove].splice(Number(button.dataset.index),1);renderAssignments();}));updateSelectedCount();}
+function updateSelectedCount(){const count=accounts.filter(a=>(selected[a.id]||[]).length>0).length;document.querySelector('#selectedCount').textContent=count+' حساب';}
+async function startBatch(){if(!promptEl.value.trim())return alert('پرامپت را وارد کن.');const assignments=[];const allFiles=[];accounts.forEach(account=>{const files=selected[account.id]||[];if(!files.length)return;const indexes=[];files.forEach(file=>{indexes.push(allFiles.length);allFiles.push(file);});assignments.push({account_id:account.id,image_indexes:indexes});});if(!assignments.length)return alert('برای حداقل یک حساب، یک یا دو عکس انتخاب کن.');const form=new FormData();form.append('prompt',promptEl.value.trim());form.append('assignments',JSON.stringify(assignments));allFiles.forEach(file=>form.append('images',file,file.name));startBtn.disabled=true;startBtn.textContent='در حال ثبت صف…';try{const result=await api('/api/batch',{method:'POST',body:form});alert('درخواست برای '+result.queued_accounts+' حساب در صف قرار گرفت.');await refreshJobs();}catch(error){alert(error.message);}startBtn.disabled=false;startBtn.textContent='▶ شروع ارسال به حساب‌ها';}
+async function refreshJobs(){try{const jobs=await api('/api/jobs');document.querySelector('#jobCount').textContent=jobs.length;jobsRoot.innerHTML=jobs.length?jobs.map(job=>{const cls=job.status==='COMPLETED'?'ok':job.status==='FAILED'||job.status==='CANCELLED'?'bad':job.status==='VERIFY_IN_GEMINI'?'warn':'working';return '<div class="job"><div class="job-head"><b>'+escapeHtml(job.account_name)+'</b><span class="status '+cls+'">'+(labels[job.status]||job.status)+'</span></div><small>'+job.image_count+' عکس</small>'+(job.error?'<p class="bad">'+escapeHtml(job.error)+'</p>':'')+(job.result_url?'<a href="'+escapeHtml(job.result_url)+'" target="_blank" rel="noopener">بازکردن گفتگو در Gemini</a>':'')+'</div>';}).join(''):'<p class="hint">هنوز ارسالی ثبت نشده است.</p>';}catch(_){}}
+document.querySelector('#refreshAccounts').addEventListener('click',loadAccounts);
+document.querySelector('#start').addEventListener('click',startBatch);
+document.querySelector('#stop').addEventListener('click',async()=>{try{await api('/api/stop',{method:'POST'});await refreshJobs();}catch(e){alert(e.message);}});
+document.querySelector('#reset').addEventListener('click',async()=>{try{await api('/api/reset',{method:'POST'});await refreshJobs();}catch(e){alert(e.message);}});
+loadAccounts();refreshJobs();setInterval(()=>{refreshJobs();loadAccounts();},5000);
