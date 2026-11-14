@@ -2,6 +2,8 @@ package com.ahmadreza.photoflow
 
 import android.content.ClipData
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.os.Parcelable
@@ -9,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,6 +23,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -259,26 +264,46 @@ private fun MatchCard(match: SuggestedMatch, originals: List<PhotoFile>, onAssig
         else -> Color(0xFFFF8585)
     }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxWidth().padding(12.dp)) {
-            Text(match.photo.name, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(when (level) {
-                MatchLevel.HIGH -> "شباهت زیاد · فاصله ${match.score?.distance}"
-                MatchLevel.REVIEW -> "نیازمند بررسی · فاصله ${match.score?.distance}"
-                else -> "تطبیق خودکار پیدا نشد"
-            }, color = tint, style = MaterialTheme.typography.labelSmall)
-            Box {
-                OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(chosen?.name ?: "انتخاب عکس اصلی برای این خروجی", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    DropdownMenuItem(text = { Text("بدون گروه") }, onClick = { onAssign(match.photo, null); expanded = false })
-                    originals.forEach { original ->
-                        DropdownMenuItem(text = { Text(original.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            onClick = { onAssign(match.photo, original.uri.toString()); expanded = false })
+        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            PhotoThumb(match.photo.uri, Modifier.size(76.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(match.photo.name, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(when (level) {
+                    MatchLevel.HIGH -> "شباهت زیاد · فاصله ${match.score?.distance}"
+                    MatchLevel.REVIEW -> "نیازمند بررسی · فاصله ${match.score?.distance}"
+                    else -> "تطبیق خودکار پیدا نشد"
+                }, color = tint, style = MaterialTheme.typography.labelSmall)
+                Box {
+                    OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(chosen?.name ?: "انتخاب عکس اصلی برای این خروجی", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        DropdownMenuItem(text = { Text("بدون گروه") }, onClick = { onAssign(match.photo, null); expanded = false })
+                        originals.forEach { original ->
+                            DropdownMenuItem(text = { Text(original.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                onClick = { onAssign(match.photo, original.uri.toString()); expanded = false })
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PhotoThumb(uri: Uri, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val bitmap by produceState<Bitmap?>(initialValue = null, key1 = uri) {
+        value = withContext(Dispatchers.IO) {
+            try { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }
+            catch (_: Exception) { null }
+        }
+    }
+    if (bitmap != null) {
+        Image(bitmap!!.asImageBitmap(), contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
+    } else {
+        Box(modifier.background(Color(0xFF30333D)), contentAlignment = Alignment.Center) { Text("عکس", color = Color.LightGray) }
     }
 }
 
