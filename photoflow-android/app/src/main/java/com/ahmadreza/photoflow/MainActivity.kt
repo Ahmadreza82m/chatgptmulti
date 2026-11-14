@@ -73,7 +73,7 @@ private fun PhotoFlowApp() {
                 PickTarget.OUTPUTS -> {
                     outputsTree = uri
                     prefs.edit().putString("outputs_tree", uri.toString()).apply()
-                    scope.launch { outputs = PhotoFiles.scan(context, uri); matches = emptyList(); status = "پوشه خروجی‌های Gemini بارگذاری شد." }
+                    scope.launch { outputs = PhotoFiles.scan(context, uri); matches = outputs.map { SuggestedMatch(it, null, null) }; status = "پوشه خروجی‌های Gemini بارگذاری شد." }
                 }
                 PickTarget.DESTINATION -> {
                     destinationTree = uri
@@ -86,7 +86,7 @@ private fun PhotoFlowApp() {
 
     LaunchedEffect(originalsTree, outputsTree) {
         originalsTree?.let { originals = PhotoFiles.scan(context, it) }
-        outputsTree?.let { outputs = PhotoFiles.scan(context, it) }
+        outputsTree?.let { val scanned = PhotoFiles.scan(context, it); outputs = scanned; if (matches.isEmpty()) matches = scanned.map { photo -> SuggestedMatch(photo, null, null) } }
     }
 
     MaterialTheme(colorScheme = darkColorScheme(
@@ -136,18 +136,8 @@ private fun PhotoFlowApp() {
                                 } else {
                                     busy = true
                                     status = "در حال مقایسه تصاویر…"
-                                    val result = withContext(Dispatchers.Default) {
-                                        outputs.map { output ->
-                                            var best: Pair<PhotoFile, MatchScore>? = null
-                                            originals.forEach { original ->
-                                                val score = ImageMatcher.compare(context.contentResolver, original.uri, output.uri)
-                                                if (best == null || score.distance < best!!.second.distance) best = original to score
-                                            }
-                                            val chosen = best
-                                            SuggestedMatch(output,
-                                                chosen?.first?.uri?.toString()?.takeIf { chosen.second.level != MatchLevel.UNMATCHED },
-                                                chosen?.second)
-                                        }
+                                    val result = ImageMatcher.matchAll(context.contentResolver, originals, outputs).map { auto ->
+                                        SuggestedMatch(auto.output, auto.original?.uri?.toString(), auto.score)
                                     }
                                     matches = result
                                     status = "بررسی تمام شد؛ موارد مشکوک را در همین صفحه اصلاح کن."
