@@ -66,7 +66,7 @@ object PhotoFiles {
     suspend fun createZip(context: Context, folder: DocumentFile, destinationTree: Uri): Uri =
         withContext(Dispatchers.IO) {
             val dest = DocumentFile.fromTreeUri(context, destinationTree) ?: error("مقصد پیدا نشد")
-            val zipDoc = dest.createFile("application/zip", uniqueName(dest, "PhotoFlow-Export.zip"))
+            val zipDoc = dest.createFile("application/zip", uniqueZipName(dest))
                 ?: error("ساخت ZIP ناموفق بود")
             context.contentResolver.openOutputStream(zipDoc.uri)?.use { raw ->
                 ZipOutputStream(BufferedOutputStream(raw)).use { zip ->
@@ -98,6 +98,15 @@ object PhotoFiles {
                 ?: error("نوشتن فایل ناموفق بود: $safe")
         } ?: error("خواندن فایل ناموفق بود: ${source.name}")
         return out.uri
+    }
+
+    private fun uniqueZipName(parent: DocumentFile): String {
+        val base = "PhotoFlow-Export"
+        val names = parent.listFiles().mapNotNull { it.name }.toSet()
+        if ("$base.zip" !in names) return "$base.zip"
+        var index = 2
+        while ("$base-$index.zip" in names) index++
+        return "$base-$index.zip"
     }
 
     private fun uniqueName(parent: DocumentFile, desired: String): String {
