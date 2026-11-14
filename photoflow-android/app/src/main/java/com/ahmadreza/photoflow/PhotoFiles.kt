@@ -19,9 +19,19 @@ object PhotoFiles {
 
     suspend fun scan(context: Context, tree: Uri): List<PhotoFile> = withContext(Dispatchers.IO) {
         val root = DocumentFile.fromTreeUri(context, tree) ?: return@withContext emptyList()
-        root.listFiles().filter { it.isFile && isImage(it) }.map { doc ->
-            PhotoFile(doc.uri, doc.name ?: "image", doc.type ?: "image/*", doc.length())
-        }.sortedBy { it.name.lowercase() }
+        fun collect(folder: DocumentFile, depth: Int): List<PhotoFile> {
+            if (depth > 20) return emptyList()
+            return folder.listFiles().flatMap { child ->
+                when {
+                    child.isDirectory -> collect(child, depth + 1)
+                    child.isFile && isImage(child) -> listOf(
+                        PhotoFile(child.uri, child.name ?: "image", child.type ?: "image/*", child.length())
+                    )
+                    else -> emptyList()
+                }
+            }
+        }
+        collect(root, 0).sortedBy { it.name.lowercase() }
     }
 
     private fun isImage(file: DocumentFile): Boolean {
