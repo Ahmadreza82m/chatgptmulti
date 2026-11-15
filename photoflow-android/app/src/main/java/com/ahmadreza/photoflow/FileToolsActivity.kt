@@ -240,6 +240,7 @@ private fun FileToolsScreen(onBack: () -> Unit) {
     var comparison by remember { mutableStateOf<FolderComparison?>(null) }
     var duplicates by remember { mutableStateOf<List<List<ManagedFile>>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
+    var showRenameConfirm by remember { mutableStateOf(false) }
     val selectedFiles = files.filter { it.key in selected }
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -352,18 +353,9 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    scope.launch {
-                        busy = true
-                        try {
-                            val chosen = files.filter { it.key in selected }
-                            val count = FileOperations.renameBatch(context, chosen, pattern)
-                            status = "نام ${count} فایل تغییر کرد."
-                            refresh()
-                        } catch (e: Exception) { status = e.message ?: "تغییر نام ناموفق بود." }
-                        busy = false
-                    }
-                }, enabled = selected.isNotEmpty() && !busy) { Text("اجرای تغییر نام") }
+                Button(onClick = { showRenameConfirm = true }, enabled = selected.isNotEmpty() && !busy) {
+                    Text("بررسی و تأیید نهایی")
+                }
                 TextButton(onClick = { selected = files.map { it.key }.toSet() }) { Text("انتخاب همه فایل‌های همه زیرپوشه‌ها") }
                 TextButton(onClick = { selected = emptySet() }) { Text("پاک‌کردن انتخاب") }
             }
@@ -408,6 +400,33 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                     }
                 }
             }
+        }
+        if (showRenameConfirm) {
+            AlertDialog(
+                onDismissRequest = { showRenameConfirm = false },
+                title = { Text("تأیید تغییر نام فایل‌ها") },
+                text = {
+                    Text("قرار است نام ${selected.size} فایل در پوشه‌ها و زیرپوشه‌های انتخاب‌شده تغییر کند. فایل‌ها جابه‌جا یا حذف نمی‌شوند. قبل از اجرا، پیش‌نمایش نام‌ها را بررسی کن.")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showRenameConfirm = false
+                        scope.launch {
+                            busy = true
+                            try {
+                                val chosen = files.filter { it.key in selected }
+                                val count = FileOperations.renameBatch(context, chosen, pattern)
+                                status = "نام ${count} فایل تغییر کرد."
+                                refresh()
+                            } catch (e: Exception) { status = e.message ?: "تغییر نام ناموفق بود." }
+                            busy = false
+                        }
+                    }) { Text("تأیید و اجرا") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRenameConfirm = false }) { Text("بازگشت") }
+                }
+            )
         }
     }
 }
