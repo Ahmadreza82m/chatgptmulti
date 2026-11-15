@@ -379,7 +379,7 @@ private fun FolderCard(title: String, uri: Uri?, count: Int?, subtitle: String, 
 private fun GroupsPage(originals: List<PhotoFile>, outputs: List<PhotoFile>, matches: List<SuggestedMatch>,
     busy: Boolean, status: String, onRunAuto: () -> Unit, onAssign: (PhotoFile, String?) -> Unit) {
     Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
-        Row(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF263A4C), Color(0xFF173B3B))).padding(16.dp),
+        Row(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF263A4C), Color(0xFF173B3B)))).padding(16.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("MATCH STUDIO", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold)
@@ -472,7 +472,7 @@ private fun ExportPage(originals: List<PhotoFile>, outputs: List<PhotoFile>, mat
     separateFolders: Boolean, busy: Boolean, fileCount: Int, status: String, onPickDestination: () -> Unit,
     onMode: (Boolean) -> Unit, onBuild: () -> Unit, onZip: () -> Unit, onShare: () -> Unit) {
     Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
-        Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF293A49), Color(0xFF173D3A), Color(0xFF24203B))).padding(18.dp),
+        Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF293A49), Color(0xFF173D3A), Color(0xFF24203B)))).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("EXPORT STUDIO", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold)
             Text("ساخت آرشیو نهایی", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Color.White)
