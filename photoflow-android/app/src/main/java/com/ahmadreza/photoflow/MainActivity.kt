@@ -12,6 +12,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -377,12 +378,18 @@ private fun FolderCard(title: String, uri: Uri?, count: Int?, subtitle: String, 
 @Composable
 private fun GroupsPage(originals: List<PhotoFile>, outputs: List<PhotoFile>, matches: List<SuggestedMatch>,
     busy: Boolean, status: String, onRunAuto: () -> Unit, onAssign: (PhotoFile, String?) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("تطبیق و گروه‌بندی", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("هر خروجی فقط به یک عکس اصلی وصل می‌شود.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+    Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
+        Row(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF263A4C), Color(0xFF173B3B))).padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("MATCH STUDIO", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold)
+                Text("تطبیق و گروه‌بندی", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                Text("هر خروجی را به عکس اصلی درست متصل کن.", color = Color(0xFFC8D6D8), style = MaterialTheme.typography.bodySmall)
+            }
+            Button(onClick = onRunAuto, enabled = !busy && originals.isNotEmpty() && outputs.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC7F36B), contentColor = Color(0xFF101711)),
+                shape = RoundedCornerShape(13.dp)) { Text(if (busy) "…" else "تحلیل خودکار", fontWeight = FontWeight.Bold) }
         }
-        Button(onClick = onRunAuto, enabled = !busy && originals.isNotEmpty() && outputs.isNotEmpty()) { Text(if (busy) "…" else "تشخیص خودکار") }
     }
     Spacer(Modifier.height(8.dp))
     if (matches.isNotEmpty()) {
@@ -410,7 +417,7 @@ private fun MatchCard(match: SuggestedMatch, originals: List<PhotoFile>, onAssig
         MatchLevel.REVIEW -> Color(0xFFFFC56D)
         else -> Color(0xFFFF8585)
     }
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF141E29))) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             PhotoThumb(match.photo.uri, Modifier.size(76.dp))
             Spacer(Modifier.width(12.dp))
@@ -454,9 +461,9 @@ private fun PhotoThumb(uri: Uri, modifier: Modifier = Modifier) {
         }
     }
     if (bitmap != null) {
-        Image(bitmap!!.asImageBitmap(), contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
+        Image(bitmap!!.asImageBitmap(), contentDescription = null, modifier = modifier.clip(RoundedCornerShape(13.dp)), contentScale = ContentScale.Crop)
     } else {
-        Box(modifier.background(Color(0xFF30333D)), contentAlignment = Alignment.Center) { Text("عکس", color = Color.LightGray) }
+        Box(modifier.background(Color(0xFF263543), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) { Text("عکس", color = Color(0xFFB5C5CD)) }
     }
 }
 
@@ -464,7 +471,15 @@ private fun PhotoThumb(uri: Uri, modifier: Modifier = Modifier) {
 private fun ExportPage(originals: List<PhotoFile>, outputs: List<PhotoFile>, matches: List<SuggestedMatch>, destination: Uri?,
     separateFolders: Boolean, busy: Boolean, fileCount: Int, status: String, onPickDestination: () -> Unit,
     onMode: (Boolean) -> Unit, onBuild: () -> Unit, onZip: () -> Unit, onShare: () -> Unit) {
-    Text("ساخت و ارسال خروجی", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
+        Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF293A49), Color(0xFF173D3A), Color(0xFF24203B))).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("EXPORT STUDIO", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold)
+            Text("ساخت آرشیو نهایی", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Color.White)
+            Text("ساختار پوشه‌ها را انتخاب کن، خروجی امن بساز و آن را فشرده یا به‌اشتراک بگذار.",
+                color = Color(0xFFC8D6D8), style = MaterialTheme.typography.bodySmall)
+        }
+    }
     Spacer(Modifier.height(8.dp))
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxWidth().padding(15.dp)) {
@@ -516,7 +531,7 @@ private fun EmptyPanel(text: String) {
 }
 @Composable
 private fun StatusPanel(text: String) {
-    Surface(color = Color(0xFF242630), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    Surface(color = Color(0xFF19252C), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text(text, modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
     }
 }
