@@ -126,11 +126,18 @@ private object FileOperations {
             "الگوی نام‌گذاری برای چند فایل نام یکسان ساخته است."
         }
         val selectedKeys = selected.map { it.key }.toSet()
+        val targetKeys = all.map { (file, name) ->
+            (file.rootUri.toString() + "|" + file.parentPath + "|" + name).lowercase()
+        }
+        require(targetKeys.distinct().size == targetKeys.size) {
+            "دو فایل در یک پوشه نمی‌توانند نام یکسان بگیرند."
+        }
         all.forEach { (file, targetName) ->
             val parent = resolveParent(context, file.rootUri, file.parentPath) ?: error("پوشه فایل پیدا نشد.")
             val collision = parent.listFiles().any { child ->
-                child.name.equals(targetName, true) &&
-                    (file.parentPath + "/" + (child.name ?: "")).trim('/') != file.relativePath
+                val childPath = (file.parentPath + "/" + (child.name ?: "")).trim('/')
+                val childKey = file.rootUri.toString() + "|" + childPath
+                child.name.equals(targetName, true) && childKey !in selectedKeys
             }
             require(!collision) { "فایلی با نام «$targetName» از قبل در پوشه وجود دارد." }
         }
