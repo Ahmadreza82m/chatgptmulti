@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -284,14 +288,30 @@ private fun FileToolsScreen(onBack: () -> Unit) {
         }
     }
 
-    MaterialTheme(colorScheme = darkColorScheme()) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+    MaterialTheme(colorScheme = darkColorScheme(
+        primary = Color(0xFFC7F36B), secondary = Color(0xFF8DE0D0),
+        background = Color(0xFF080C12), surface = Color(0xFF121A24),
+        surfaceVariant = Color(0xFF1D2936), onBackground = Color(0xFFF4F7F1), onSurface = Color(0xFFF4F7F1)
+    )) {
+        Column(Modifier.fillMaxSize().background(Color(0xFF080C12)).verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Card(shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
+                Row(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF263A4C), Color(0xFF173B3B), Color(0xFF24203D)))).padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text("PHOTO FLOW  /  TOOLS", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold)
+                        Text("مرکز فرمان فایل‌ها", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                        Text("مدیریت چندپوشه‌ای، عملیات گروهی و کنترل دقیق آرشیو", color = Color(0xFFC7D4D7), style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text("▤", color = Color(0xFFC7F36B), style = MaterialTheme.typography.displaySmall)
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack) { Text("بازگشت") }
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("مدیریت پیشرفته فایل‌ها", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("قابلیت‌های ۱ تا ۶", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                TextButton(onClick = onBack) { Text("← بازگشت") }
+                Spacer(Modifier.weight(1f))
+                Surface(color = Color(0xFF1D302D), shape = RoundedCornerShape(50)) {
+                    Text("ADVANCED", modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = Color(0xFFC7F36B),
+                        style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -315,6 +335,7 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                 }
             }
             Divider()
+            ToolPanel {
             Text("۲. مقایسه دو پوشه", fontWeight = FontWeight.Bold)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 RootPicker("پوشه اول", roots, leftRoot) { leftRoot = it }
@@ -339,7 +360,9 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                     Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            }
             Divider()
+            ToolPanel {
             Text("۳. نام‌گذاری هوشمند و گروهی", fontWeight = FontWeight.Bold)
             Text("اسکن فایل‌ها به‌صورت بازگشتی انجام می‌شود؛ یعنی تمام زیرپوشه‌ها و زیرپوشه‌های تو‌در‌تو هم بررسی می‌شوند.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -371,7 +394,9 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                 TextButton(onClick = { selected = files.map { it.key }.toSet() }) { Text("انتخاب همه فایل‌های همه زیرپوشه‌ها") }
                 TextButton(onClick = { selected = emptySet() }) { Text("پاک‌کردن انتخاب") }
             }
+            }
             Divider()
+            ToolPanel {
             Text("۴ و ۵. کپی یا انتقال گروهی", fontWeight = FontWeight.Bold)
             RootPicker("پوشه مقصد", roots, destination) { destination = it }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -380,7 +405,9 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                 Button(onClick = { runFileTransfer(context, scope, files, selected, destination, true, { busy = it }, { status = it }, ::refresh) },
                     enabled = selected.isNotEmpty() && destination != null && !busy) { Text("انتقال فایل‌ها") }
             }
+            }
             Divider()
+            ToolPanel {
             Text("۶. شناسایی فایل‌های کاملاً یکسان", fontWeight = FontWeight.Bold)
             OutlinedButton(onClick = {
                 scope.launch {
@@ -396,7 +423,9 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                 Text("گروه ${index + 1}: ${group.size} نسخه — ${group.first().name}", style = MaterialTheme.typography.bodySmall)
             }
             Text(status, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
+            }
             Divider()
+            ToolPanel {
             Text("۱. فایل‌های همه پوشه‌ها — ${files.size}", fontWeight = FontWeight.Bold)
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 files.forEach { file ->
@@ -411,7 +440,8 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                         }
                     }
                 }
-            }
+            }            }
+
         }
         if (showRenameConfirm) {
             AlertDialog(
@@ -440,6 +470,13 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                 }
             )
         }
+    }
+}
+
+@Composable
+private fun ToolPanel(content: @Composable ColumnScope.() -> Unit) {
+    Card(shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF121A24))) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp), content = content)
     }
 }
 
