@@ -206,7 +206,12 @@ private fun ProjectPage(originalsTree: Uri?, outputsTree: Uri?, destinationTree:
     Button(
         onClick = { context.startActivity(Intent(context, FileToolsActivity::class.java)) },
         modifier = Modifier.fillMaxWidth()
-    ) { Text("مدیریت پیشرفته فایل‌ها · قابلیت‌های ۱ تا ۶") }
+    ) { Text("مدیریت فایل‌ها · قابلیت‌های ۱ تا ۶") }
+    Spacer(Modifier.height(7.dp))
+    OutlinedButton(
+        onClick = { context.startActivity(Intent(context, LibraryToolsActivity::class.java)) },
+        modifier = Modifier.fillMaxWidth()
+    ) { Text("کتابخانه هوشمند · فیلتر، دسته‌بندی و پردازش تصویر") }
 
     Spacer(Modifier.height(10.dp))
     FolderCard("عکس‌های اصلی", originalsTree, originalCount, "پوشه‌ای که عکس‌های اولیه داخل آن هستند") { onPick(PickTarget.ORIGINALS) }
