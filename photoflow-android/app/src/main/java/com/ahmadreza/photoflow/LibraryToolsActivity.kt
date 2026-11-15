@@ -30,6 +30,60 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import org.json.JSONArray
+import org.json.JSONObject
+
+
+private object LibraryAudit {
+    private const val HISTORY = "library_operation_history"
+    private const val ERRORS = "library_error_log"
+    fun record(p: android.content.SharedPreferences, action: String, key: String, before: String, after: String) {
+        val a = runCatching { JSONArray(p.getString(HISTORY, "[]") ?: "[]") }.getOrDefault(JSONArray())
+        a.put(JSONObject().put("action", action).put("key", key).put("before", before).put("after", after))
+        while (a.length() > 100) a.remove(0)
+        p.edit().putString(HISTORY, a.toString()).apply()
+    }
+    fun logError(p: android.content.SharedPreferences, message: String) {
+        val a = runCatching { JSONArray(p.getString(ERRORS, "[]") ?: "[]") }.getOrDefault(JSONArray())
+        a.put(message.take(500))
+        while (a.length() > 50) a.remove(0)
+        p.edit().putString(ERRORS, a.toString()).apply()
+    }
+    fun history(p: android.content.SharedPreferences): List<String> {
+        val a = runCatching { JSONArray(p.getString(HISTORY, "[]") ?: "[]") }.getOrDefault(JSONArray())
+        return (0 until a.length()).mapNotNull { i -> runCatching {
+            val x = a.getJSONObject(i)
+            val label = when (x.optString("action")) {
+                "favorite" -> "علاقه‌مندی"; "marked" -> "علامت فایل"
+                "category" -> "دسته‌بندی"; "tags" -> "برچسب‌ها"; else -> "تغییر"
+            }
+            "$label • ${x.optString("key").substringAfterLast('/').take(28)}"
+        }.getOrNull() }.reversed()
+    }
+    fun errors(p: android.content.SharedPreferences): List<String> {
+        val a = runCatching { JSONArray(p.getString(ERRORS, "[]") ?: "[]") }.getOrDefault(JSONArray())
+        return (0 until a.length()).mapNotNull { i -> runCatching { a.getString(i) }.getOrNull() }.reversed()
+    }
+    fun undo(p: android.content.SharedPreferences): Boolean {
+        val a = runCatching { JSONArray(p.getString(HISTORY, "[]") ?: "[]") }.getOrDefault(JSONArray())
+        if (a.length() == 0) return false
+        val x = a.optJSONObject(a.length() - 1) ?: return false
+        val key = x.optString("key"); val before = x.optString("before")
+        when (x.optString("action")) {
+            "favorite", "marked" -> {
+                val pref = if (x.optString("action") == "favorite") "library_favorites" else "library_marked"
+                val values = p.getStringSet(pref, emptySet()).orEmpty().toMutableSet()
+                if (before == "true") values.add(key) else values.remove(key)
+                p.edit().putStringSet(pref, values).apply()
+            }
+            "category" -> p.edit().putString("category:${encodeKey(key)}", before).apply()
+            "tags" -> p.edit().putStringSet("tags:${encodeKey(key)}", before.split('\n').filter { it.isNotBlank() }.toSet()).apply()
+            else -> return false
+        }
+        a.remove(a.length() - 1); p.edit().putString(HISTORY, a.toString()).apply()
+        return true
+    }
+}
 
 private data class LibraryRoot(val uri: Uri, val name: String)
 private data class LibraryFile(val root: Uri, val path: String, val name: String, val mime: String, val size: Long) {
@@ -160,6 +214,9 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
     var favoriteKeys by remember { mutableStateOf(prefs.getStringSet("library_favorites", emptySet()).orEmpty()) }
     var markedKeys by remember { mutableStateOf(prefs.getStringSet("library_marked", emptySet()).orEmpty()) }
     var markedOnly by remember { mutableStateOf(false) }
+    var showHistoryDialog by remember { mutableStateOf(false) }
+    var showErrorsDialog by remember { mutableStateOf(false) }
+    var showHealthDialog by remember { mutableStateOf(false) }
     var categories by remember { mutableStateOf(prefs.getStringSet("library_categories", setOf("بدون دسته")).orEmpty().toList().sorted()) }
     var search by remember { mutableStateOf("") }
     var tagSearch by remember { mutableStateOf("") }
@@ -176,8 +233,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
     var tagText by remember { mutableStateOf("") }
     var showConvertDialog by remember { mutableStateOf(false) }
     var outputFormat by remember { mutableStateOf("jpg") }
-    var quality by remember { mutableIntStateOf(82) }
-    var destinationExpanded by remember { mutableStateOf(false) }
+    var quality by remember { mutableIntStateOf(82) }    var destinationExpanded by remember { mutableStateOf(false) }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
@@ -196,7 +252,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                 files = LibraryOps.scan(context, roots)
                 selected = selected intersect files.map { it.key }.toSet()
                 status = "${files.size} فایل از ${roots.size} پوشه بارگذاری شد."
-            } catch (e: Exception) { status = e.message ?: "اسکن انجام نشد." }
+            } catch (e: Exception) { status = e.message ?: "اسکن انجام نشد."; LibraryAudit.logError(prefs, status) }
             busy = false
         }
     }
@@ -249,6 +305,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                                 Text("فضای فایل‌های تو", color = Color(0xFFB9B4FF), style = MaterialTheme.typography.labelLarge)
                                 Text("${files.size} فایل شناسایی‌شده", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
                 Text("${markedKeys.size} فایل علامت‌گذاری‌شده", color = Color(0xFF9B8CFF), style = MaterialTheme.typography.labelMedium)
+                                Text("ذخیره خودکار روشن است • داده‌ها روی همین دستگاه ذخیره می‌شوند", color = Color(0xFFAAA8BE), style = MaterialTheme.typography.labelSmall)
                                 Text("بدون تغییر در فایل‌های اصلی؛ ابزارها روی نسخه خروجی کار می‌کنند.", color = Color(0xFFD0D1E0), style = MaterialTheme.typography.bodySmall)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     MetricTile("تصاویر", imageFiles.size.toString(), Modifier.weight(1f))
@@ -260,6 +317,11 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                     }
                 }
                 item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { showHistoryDialog = true }, modifier = Modifier.weight(1f)) { Text("تاریخچه و بازگشت") }
+                        OutlinedButton(onClick = { showErrorsDialog = true }, modifier = Modifier.weight(1f)) { Text("گزارش خطاها") }
+                    }
+                    OutlinedButton(onClick = { showHealthDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("بررسی سلامت پوشه‌ها") }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { folderPicker.launch(null) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) { Text("افزودن پوشه +") }
                         OutlinedButton(onClick = { scanNow() }, enabled = roots.isNotEmpty() && !busy, modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp)) { Text("بازخوانی فایل‌ها") }
@@ -356,8 +418,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                             favoriteKeys = if (file.key in favoriteKeys) favoriteKeys - file.key else favoriteKeys + file.key
                             prefs.edit().putStringSet("library_favorites", favoriteKeys).apply()
                         },
-                        onMarked = {
-                            markedKeys = if (file.key in markedKeys) markedKeys - file.key else markedKeys + file.key
+                        onMarked = {                            markedKeys = if (file.key in markedKeys) markedKeys - file.key else markedKeys + file.key
                             prefs.edit().putStringSet("library_marked", markedKeys).apply()
                         },
                         onCategory = { cat -> prefs.edit().putString("category:${encodeKey(file.key)}", cat).apply(); status = "دسته فایل به «$cat» تغییر کرد." },
