@@ -105,6 +105,23 @@ private object FileOperations {
             }
         }
 
+    suspend fun findSimilarImages(context: android.content.Context, files: List<ManagedFile>): List<List<ManagedFile>> =
+        withContext(Dispatchers.IO) {
+            val imageFiles = files.filter { it.mime.startsWith("image/") }
+            val photos = imageFiles.mapNotNull { file ->
+                val doc = resolve(context, file.rootUri, file.relativePath) ?: return@mapNotNull null
+                PhotoFile(doc.uri, file.name, file.mime, file.size)
+            }
+            val groups = ImageMatcher.findSimilarGroups(context.contentResolver, photos, maxDistance = 8)
+            val byUri = imageFiles.mapNotNull { file ->
+                val doc = resolve(context, file.rootUri, file.relativePath) ?: return@mapNotNull null
+                doc.uri.toString() to file
+            }.toMap()
+            groups.mapNotNull { group ->
+                group.mapNotNull { byUri[it.uri.toString()] }.takeIf { it.size > 1 }
+            }
+        }
+
     private fun sha256(context: android.content.Context, file: ManagedFile): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val doc = resolve(context, file.rootUri, file.relativePath) ?: error("فایل پیدا نشد: ${file.name}")
@@ -255,6 +272,7 @@ private fun FileToolsScreen(onBack: () -> Unit) {
     var status by remember { mutableStateOf("چند پوشه اضافه کن تا ابزارهای مدیریت فایل فعال شوند.") }
     var comparison by remember { mutableStateOf<FolderComparison?>(null) }
     var duplicates by remember { mutableStateOf<List<List<ManagedFile>>>(emptyList()) }
+    var similarGroups by remember { mutableStateOf<List<List<ManagedFile>>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var showRenameConfirm by remember { mutableStateOf(false) }
     val selectedFiles = files.filter { it.key in selected }
@@ -421,6 +439,29 @@ private fun FileToolsScreen(onBack: () -> Unit) {
             }, enabled = files.size > 1 && !busy) { Text("بررسی تکراری‌ها با SHA-256") }
             duplicates.forEachIndexed { index, group ->
                 Text("گروه ${index + 1}: ${group.size} نسخه — ${group.first().name}", style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("تشخیص تصاویر مشابه (حتی با اندازه یا فشرده‌سازی متفاوت)", fontWeight = FontWeight.SemiBold)
+            Text("این بررسی بر اساس شباهت ظاهری است، نه یکسان بودن بایت‌به‌بایت فایل. نتیجه‌ها را قبل از حذف یا جابه‌جایی بررسی کن.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = {
+                scope.launch {
+                    busy = true
+                    try {
+                        similarGroups = FileOperations.findSimilarImages(context, files)
+                        status = "${similarGroups.size} گروه تصویر مشابه پیدا شد."
+                    } catch (e: Exception) { status = e.message ?: "بررسی تصاویر مشابه ناموفق بود." }
+                    busy = false
+                }
+            }, enabled = files.count { it.mime.startsWith("image/") } > 1 && !busy) {
+                Text(if (busy) "در حال تحلیل تصاویر…" else "تحلیل تصاویر مشابه با pHash")
+            }
+            similarGroups.forEachIndexed { index, group ->
+                Text("گروه مشابه ${index + 1} · ${group.size} تصویر", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+                group.forEach { photo ->
+                    Text("• ${photo.relativePath}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
             Text(status, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
             }
