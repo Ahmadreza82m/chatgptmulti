@@ -41,7 +41,8 @@ private data class ManagedFile(
 private data class FolderComparison(
     val onlyLeft: List<String>,
     val onlyRight: List<String>,
-    val sizeDifferent: List<String>
+    val sizeDifferent: List<String>,
+    val contentDifferent: List<String>
 )
 
 class FileToolsActivity : ComponentActivity() {
@@ -74,15 +75,24 @@ private object FileOperations {
             }.distinctBy { it.key }.sortedWith(compareBy({ it.name.lowercase() }, { it.relativePath.lowercase() }))
         }
 
-    fun compare(left: List<ManagedFile>, right: List<ManagedFile>): FolderComparison {
-        val a = left.associateBy { it.relativePath }
-        val b = right.associateBy { it.relativePath }
-        return FolderComparison(
-            onlyLeft = (a.keys - b.keys).sorted(),
-            onlyRight = (b.keys - a.keys).sorted(),
-            sizeDifferent = (a.keys intersect b.keys).filter { a[it]?.size != b[it]?.size }.sorted()
-        )
-    }
+    suspend fun compare(context: android.content.Context, left: List<ManagedFile>, right: List<ManagedFile>): FolderComparison =
+        withContext(Dispatchers.IO) {
+            val a = left.associateBy { it.relativePath }
+            val b = right.associateBy { it.relativePath }
+            val shared = a.keys intersect b.keys
+            val sizeDiff = shared.filter { a[it]?.size != b[it]?.size }.sorted()
+            val contentDiff = shared.filter { path ->
+                val first = a[path]!!
+                val second = b[path]!!
+                first.size == second.size && sha256(context, first) != sha256(context, second)
+            }.sorted()
+            FolderComparison(
+                onlyLeft = (a.keys - b.keys).sorted(),
+                onlyRight = (b.keys - a.keys).sorted(),
+                sizeDifferent = sizeDiff,
+                contentDifferent = contentDiff
+            )
+        }
 
     suspend fun findDuplicates(context: android.content.Context, files: List<ManagedFile>): List<List<ManagedFile>> =
         withContext(Dispatchers.IO) {
@@ -307,13 +317,22 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                 Button(onClick = {
                     val a = files.filter { it.rootUri == leftRoot }
                     val b = files.filter { it.rootUri == rightRoot }
-                    comparison = FileOperations.compare(a, b)
-                    status = "مقایسه انجام شد."
+                    scope.launch {
+                        busy = true
+                        try {
+                            comparison = FileOperations.compare(context, a, b)
+                            status = "مقایسه مسیرها، اندازه و محتوای فایل‌ها انجام شد."
+                        } catch (e: Exception) { status = e.message ?: "مقایسه ناموفق بود." }
+                        busy = false
+                    }
                 }, enabled = leftRoot != null && rightRoot != null && !busy) { Text("مقایسه") }
             }
             comparison?.let { result ->
-                Text("فقط در اول: ${result.onlyLeft.size}  •  فقط در دوم: ${result.onlyRight.size}  •  اختلاف حجم: ${result.sizeDifferent.size}",
+                Text("فقط در اول: ${result.onlyLeft.size}  •  فقط در دوم: ${result.onlyRight.size}  •  اختلاف اندازه: ${result.sizeDifferent.size}  •  محتوای متفاوت: ${result.contentDifferent.size}",
                     style = MaterialTheme.typography.bodySmall)
+                (result.onlyLeft + result.onlyRight + result.sizeDifferent + result.contentDifferent).take(5).forEach {
+                    Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             Divider()
             Text("۳. تغییر نام گروهی", fontWeight = FontWeight.Bold)
@@ -322,6 +341,11 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                 label = { Text("الگو: {name} نام قبلی، {index} شماره، {ext} پسوند") }, singleLine = true
             )
             Text("انتخاب‌شده: ${selected.size}", style = MaterialTheme.typography.bodySmall)
+            files.filter { it.key in selected }.take(4).forEachIndexed { index, file ->
+                Text("پیش‌نمایش: ${file.name}  ←  ${previewRename(file.name, pattern, index)}",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
                     scope.launch {
@@ -430,4 +454,15 @@ private fun formatSize(size: Long): String = when {
     size < 1024 * 1024 -> "%.1f KB".format(size / 1024.0)
     size < 1024L * 1024L * 1024L -> "%.1f MB".format(size / (1024.0 * 1024.0))
     else -> "%.2f GB".format(size / (1024.0 * 1024.0 * 1024.0))
+}
+
+private fun previewRename(name: String, pattern: String, index: Int): String {
+    val ext = name.substringAfterLast('.', "").takeIf { '.' in name }.orEmpty()
+    val base = name.substringBeforeLast('.', name)
+    var result = pattern.replace("{name}", base)
+        .replace("{index}", (index + 1).toString().padStart(2, '0'))
+        .replace("{ext}", ext)
+        .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+    if (ext.isNotEmpty() && !pattern.contains("{ext}") && !result.endsWith(".$ext", true)) result += ".$ext"
+    return result
 }
