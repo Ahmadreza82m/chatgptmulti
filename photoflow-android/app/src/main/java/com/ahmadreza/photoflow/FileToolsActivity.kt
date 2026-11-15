@@ -107,7 +107,10 @@ private object FileOperations {
 
     suspend fun findSimilarImages(context: android.content.Context, files: List<ManagedFile>): List<List<ManagedFile>> =
         withContext(Dispatchers.IO) {
-            val imageFiles = files.filter { it.mime.startsWith("image/") }
+            val imageFiles = files.filter { file ->
+                file.mime.startsWith("image/") || file.name.substringAfterLast('.', "").lowercase() in
+                    setOf("jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "heif")
+            }
             val photos = imageFiles.mapNotNull { file ->
                 val doc = resolve(context, file.rootUri, file.relativePath) ?: return@mapNotNull null
                 PhotoFile(doc.uri, file.name, file.mime, file.size)
@@ -275,7 +278,11 @@ private fun FileToolsScreen(onBack: () -> Unit) {
     var similarGroups by remember { mutableStateOf<List<List<ManagedFile>>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var showRenameConfirm by remember { mutableStateOf(false) }
+    var showRenamePreview by remember { mutableStateOf(false) }
     val selectedFiles = files.filter { it.key in selected }
+    val renamePlanResult = remember(pattern, selectedFiles) {
+        runCatching { SmartRenameEngine.buildPlan(selectedFiles.map { it.parentPath to it.name }, pattern) }
+    }
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -396,17 +403,28 @@ private fun FileToolsScreen(onBack: () -> Unit) {
             }
             Text("راهنما: {clean}=حذف پیشوند عددی، {autoIndex}=شماره فقط برای موارد تکراری، {index}=شماره دو رقمی همه فایل‌ها، {number}=شماره ساده، {ext}=پسوند، {folder}=نام زیرپوشه.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("انتخاب‌شده: ${selected.size}", style = MaterialTheme.typography.bodySmall)
-            selectedFiles.take(8).forEachIndexed { index, file ->
+            Text("انتخاب‌شده: ${selected.size} فایل", style = MaterialTheme.typography.bodySmall)
+            Text(
+                renamePlanResult.fold(
+                    onSuccess = { "الگو معتبر است · ${it.size} نام قابل تولید" },
+                    onFailure = { "نیاز به اصلاح الگو: ${it.message ?: "نام‌گذاری نامعتبر"}" }
+                ),
+                color = if (renamePlanResult.isSuccess) Color(0xFFC7F36B) else MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+            selectedFiles.take(5).forEachIndexed { index, file ->
                 val clean = SmartRenameEngine.cleanStem(file.name).lowercase()
                 val occurrence = selectedFiles.take(index + 1).count { SmartRenameEngine.cleanStem(it.name).lowercase() == clean }
                 val total = selectedFiles.count { SmartRenameEngine.cleanStem(it.name).lowercase() == clean }
-                Text("پیش‌نمایش: ${file.relativePath}  ←  ${SmartRenameEngine.previewName(file.name, file.parentPath, pattern, index, occurrence, total)}",
+                Text("نمونه: ${file.name}  ←  ${SmartRenameEngine.previewName(file.name, file.parentPath, pattern, index, occurrence, total)}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showRenameConfirm = true }, enabled = selected.isNotEmpty() && !busy) {
+                OutlinedButton(onClick = { showRenamePreview = true }, enabled = selected.isNotEmpty() && renamePlanResult.isSuccess) {
+                    Text("پیش‌نمایش کامل ${selected.size} فایل")
+                }
+                Button(onClick = { showRenameConfirm = true }, enabled = selected.isNotEmpty() && !busy && renamePlanResult.isSuccess) {
                     Text("بررسی و تأیید نهایی")
                 }
                 TextButton(onClick = { selected = files.map { it.key }.toSet() }) { Text("انتخاب همه فایل‌های همه زیرپوشه‌ها") }
@@ -483,6 +501,35 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                 }
             }            }
 
+        }
+        if (showRenamePreview) {
+            AlertDialog(
+                onDismissRequest = { showRenamePreview = false },
+                title = { Text("پیش‌نمایش کامل نام‌گذاری") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("${selectedFiles.size} فایل · نام فعلی و نام نهایی", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary)
+                        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(selectedFiles, key = { it.key }) { file ->
+                                val index = selectedFiles.indexOf(file)
+                                val clean = SmartRenameEngine.cleanStem(file.name).lowercase()
+                                val occurrence = selectedFiles.take(index + 1).count { SmartRenameEngine.cleanStem(it.name).lowercase() == clean }
+                                val total = selectedFiles.count { SmartRenameEngine.cleanStem(it.name).lowercase() == clean }
+                                Column(Modifier.fillMaxWidth().background(Color(0xFF1D2936), RoundedCornerShape(10.dp)).padding(9.dp)) {
+                                    Text(file.name, style = MaterialTheme.typography.bodySmall, color = Color(0xFFB6C5CD),
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("↓", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall)
+                                    Text(SmartRenameEngine.previewName(file.name, file.parentPath, pattern, index, occurrence, total),
+                                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold,
+                                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showRenamePreview = false }) { Text("بستن") } }
+            )
         }
         if (showRenameConfirm) {
             AlertDialog(
