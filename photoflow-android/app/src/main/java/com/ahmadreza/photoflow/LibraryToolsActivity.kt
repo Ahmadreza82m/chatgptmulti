@@ -176,8 +176,7 @@ private object LibraryOps {
         completed
     }
 
-    private fun calculateSample(width: Int, height: Int): Int {        var sample = 1
-        while (width / sample > 4096 || height / sample > 4096) sample *= 2
+    private fun calculateSample(width: Int, height: Int): Int {        var sample = 1        while (width / sample > 4096 || height / sample > 4096) sample *= 2
         return sample
     }
 
@@ -232,7 +231,8 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
     var tagText by remember { mutableStateOf("") }
     var showConvertDialog by remember { mutableStateOf(false) }
     var outputFormat by remember { mutableStateOf("jpg") }
-    var quality by remember { mutableIntStateOf(82) }    var destinationExpanded by remember { mutableStateOf(false) }
+    var quality by remember { mutableIntStateOf(82) }
+    var destinationExpanded by remember { mutableStateOf(false) }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
@@ -356,8 +356,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                             DropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }) {
                                 (listOf("همه دسته‌ها") + categories).forEach { cat ->
                                     DropdownMenuItem(text = { Text(cat) }, onClick = { categoryFilter = cat; catExpanded = false })                                }
-                            }
-                        }
+                            }                        }
                     }
                     Text("${filtered.size} نتیجه از ${files.size} فایل", color = Color(0xFFAAA8BE), style = MaterialTheme.typography.labelSmall)
                 }
@@ -434,7 +433,8 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                             tagTarget = file
                             tagText = prefs.getStringSet("tags:${encodeKey(file.key)}", emptySet()).orEmpty().joinToString(", ")
                         }
-                    )                }
+                    )
+                }
                 item {
                     Text(status, color = Color(0xFFAAA8BE), style = MaterialTheme.typography.bodySmall)
                     Text("آمار: ${imageFiles.size} تصویر • ${files.count { it.mime.startsWith("video/") }} ویدئو • ${favoriteCount} علاقه‌مندی",
@@ -536,8 +536,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf("jpg", "png", "webp").forEach { format ->
                             FilterChip(selected = outputFormat == format, onClick = { outputFormat = format }, label = { Text(format.uppercase()) })
-                        }
-                    }
+                        }                    }
                 } else Text("فرمت اصلی حفظ می‌شود؛ کیفیت JPEG و WebP قابل تنظیم است.")
                 Text("کیفیت خروجی: $quality٪")
                 Slider(value = quality.toFloat(), onValueChange = { quality = it.toInt() }, valueRange = 45f..100f)
@@ -592,7 +591,8 @@ private fun LibraryFileCard(
             Text(file.path, color = Color(0xFF777D95), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Box {
-                    AssistChip(onClick = { menu = true }, label = { Text(category) })                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    AssistChip(onClick = { menu = true }, label = { Text(category) })
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text("بدون دسته") }, onClick = { onCategory("بدون دسته"); menu = false })
                         categories.filter { it != "بدون دسته" }.forEach { cat ->
                             DropdownMenuItem(text = { Text(cat) }, onClick = { onCategory(cat); menu = false })
