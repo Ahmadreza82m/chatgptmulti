@@ -157,8 +157,13 @@ private object FileOperations {
         } catch (error: Exception) {
             // Every selected file was staged before final names are applied.
             // The original names are therefore free and can be restored directly.
-            staged.forEach { item ->
-                runCatching { item.document.renameTo(item.file.name) }
+            staged.asReversed().forEach { item ->
+                runCatching {
+                    val parent = resolveParent(context, item.file.rootUri, item.file.parentPath)
+                    val current = parent?.findFile(item.targetName)
+                        ?: parent?.findFile(item.tempName)
+                    current?.renameTo(item.file.name)
+                }
             }
             throw error
         }
