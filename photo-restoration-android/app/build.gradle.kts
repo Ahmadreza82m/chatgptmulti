@@ -33,5 +33,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // On-device neural-network runtime; model files are installed separately.
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
