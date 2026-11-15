@@ -218,7 +218,7 @@ private fun FileToolsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("photoflow-file-tools", 0) }
     val scope = rememberCoroutineScope()
-    fun readRoots(): List<ManagedRoot> = prefs.getStringSet("roots", emptySet()).orEmpty().mapNotNull { raw ->
+    fun readRoots(): List<ManagedRoot> = prefs.getStringSet("roots", mutableSetOf<String>()).orEmpty().mapNotNull { raw ->
         runCatching { Uri.parse(raw) }.getOrNull()?.let { ManagedRoot(it, it.lastPathSegment?.substringAfterLast(':') ?: "پوشه") }
     }.sortedBy { it.label }
     var roots by remember { mutableStateOf(readRoots()) }
