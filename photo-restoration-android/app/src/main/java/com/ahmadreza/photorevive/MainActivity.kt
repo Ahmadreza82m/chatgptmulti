@@ -11,14 +11,20 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,10 +39,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.size
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -98,12 +110,14 @@ private fun PhotoReviveScreen(appContext: android.content.Context, onSave: (Bitm
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("عکس‌ها را انتخاب کن؛ فایل اصلی تغییر نمی‌کند.") }
+    var comparison by remember { mutableStateOf<Pair<Bitmap, Bitmap>?>(null) }
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
         selected.clear()
         selected.addAll(uris)
+        comparison = null
         message = if (uris.isEmpty()) "هنوز عکسی انتخاب نشده است." else "${uris.size} عکس انتخاب شد."
     }
 
@@ -127,6 +141,7 @@ private fun PhotoReviveScreen(appContext: android.content.Context, onSave: (Bitm
             OutlinedButton(
                 onClick = {
                     selected.clear()
+                    comparison = null
                     message = "انتخاب عکس‌ها پاک شد."
                 },
                 enabled = selected.isNotEmpty() && !busy
@@ -165,6 +180,39 @@ private fun PhotoReviveScreen(appContext: android.content.Context, onSave: (Bitm
             Text(if (busy) "در حال پردازش..." else "بهبود و ذخیره نسخه‌ها")
         }
 
+        OutlinedButton(
+            onClick = {
+                val uri = selected.firstOrNull() ?: return@OutlinedButton
+                if (busy) return@OutlinedButton
+                busy = true
+                comparison = null
+                message = "در حال آماده‌سازی مقایسه..."
+                scope.launch {
+                    val pair = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val original = contentResolverFor(appContext, uri)
+                                ?: error("خواندن عکس ناموفق بود")
+                            original to ImageEnhancer.enhance(original)
+                        }.getOrNull()
+                    }
+                    comparison = pair
+                    busy = false
+                    message = if (pair == null) "ساخت پیش‌نمایش ناموفق بود؛ عکس دیگری انتخاب کن."
+                    else "مرز وسط عکس را با انگشت به چپ و راست بکش و دو نسخه را مقایسه کن."
+                }
+            },
+            enabled = selected.isNotEmpty() && !busy,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (busy) "لطفاً صبر کن..." else "مقایسه قبل و بعد")
+        }
+
+        comparison?.let { (before, after) ->
+            Text("مقایسهٔ زنده — انگشتت را روی خط وسط بکش", style = MaterialTheme.typography.titleSmall)
+            BeforeAfterComparison(before = before, after = after)
+            Text("سمت راست: نسخهٔ بهبودیافته  |  سمت چپ: عکس اصلی", style = MaterialTheme.typography.bodySmall)
+        }
+
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(selected, key = { it.toString() }) { uri ->
                 Card(
@@ -189,8 +237,62 @@ private fun PhotoReviveScreen(appContext: android.content.Context, onSave: (Bitm
     }
 }
 
+@Composable
+private fun BeforeAfterComparison(before: Bitmap, after: Bitmap) {
+    var split by remember(before, after) { mutableStateOf(0.5f) }
+    val beforeImage = remember(before) { before.asImageBitmap() }
+    val afterImage = remember(after) { after.asImageBitmap() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(4f / 3f)
+            .clip(RoundedCornerShape(14.dp))
+    ) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(before, after) {
+                    detectDragGestures { change, _ ->
+                        change.consume()
+                        split = (change.position.x / size.width.toFloat()).coerceIn(0.02f, 0.98f)
+                    }
+                }
+        ) {
+            val destination = IntSize(size.width.toInt(), size.height.toInt())
+            drawImage(beforeImage, dstSize = destination)
+            clipRect(left = size.width * split, top = 0f, right = size.width, bottom = size.height) {
+                drawImage(afterImage, dstSize = destination)
+            }
+            val dividerX = size.width * split
+            drawLine(
+                color = Color.White,
+                start = androidx.compose.ui.geometry.Offset(dividerX, 0f),
+                end = androidx.compose.ui.geometry.Offset(dividerX, size.height),
+                strokeWidth = 4.dp.toPx()
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 13.dp.toPx(),
+                center = androidx.compose.ui.geometry.Offset(dividerX, size.height / 2f)
+            )
+            drawCircle(
+                color = Color.DarkGray,
+                radius = 9.dp.toPx(),
+                center = androidx.compose.ui.geometry.Offset(dividerX, size.height / 2f)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("اصل", color = Color.White, style = MaterialTheme.typography.labelLarge)
+            Text("بهبودیافته", color = Color.White, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
 private fun contentResolverFor(context: android.content.Context, uri: Uri): Bitmap? {
-    // Resolve through the URI's content provider; no broad storage permission is needed.
     return runCatching {
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
     }.getOrNull()
