@@ -63,7 +63,7 @@ object SmartRenameEngine {
             val key = clean.lowercase()
             val occurrence = (seen[key] ?: 0) + 1
             seen[key] = occurrence
-            val autoIndex = if (totals[key] > 1 && occurrence > 1) " - %02d".format(occurrence - 1) else ""
+            val autoIndex = if ((totals[key] ?: 0) > 1 && occurrence > 1) " - %02d".format(occurrence - 1) else ""
 
             var result = pattern
                 .replace("{name}", originalStem)
