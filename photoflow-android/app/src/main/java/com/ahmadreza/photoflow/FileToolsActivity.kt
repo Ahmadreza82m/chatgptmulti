@@ -311,7 +311,7 @@ private fun FileToolsScreen(onBack: () -> Unit) {
             }
             Divider()
             Text("۲. مقایسه دو پوشه", fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 RootPicker("پوشه اول", roots, leftRoot) { leftRoot = it }
                 RootPicker("پوشه دوم", roots, rightRoot) { rightRoot = it }
                 Button(onClick = {
@@ -389,8 +389,8 @@ private fun FileToolsScreen(onBack: () -> Unit) {
             Text(status, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
             Divider()
             Text("۱. فایل‌های همه پوشه‌ها — ${files.size}", fontWeight = FontWeight.Bold)
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                items(files, key = { it.key }) { file ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                files.forEach { file ->
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Checkbox(checked = file.key in selected, onCheckedChange = { checked ->
                             selected = if (checked) selected + file.key else selected - file.key
