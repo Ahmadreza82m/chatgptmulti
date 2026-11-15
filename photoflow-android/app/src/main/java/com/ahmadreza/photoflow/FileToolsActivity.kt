@@ -279,7 +279,15 @@ private fun FileToolsScreen(onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var showRenameConfirm by remember { mutableStateOf(false) }
     var showRenamePreview by remember { mutableStateOf(false) }
+    var fileSearch by remember { mutableStateOf("") }
+    var imagesOnly by remember { mutableStateOf(false) }
+    var largestFirst by remember { mutableStateOf(false) }
     val selectedFiles = files.filter { it.key in selected }
+    val visibleFiles = files.filter { file ->
+        (!imagesOnly || file.mime.startsWith("image/") || file.name.substringAfterLast('.', "").lowercase() in
+            setOf("jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "heif")) &&
+            (fileSearch.isBlank() || file.name.contains(fileSearch, true) || file.relativePath.contains(fileSearch, true))
+    }.let { list -> if (largestFirst) list.sortedByDescending { it.size } else list }
     val renamePlanResult = remember(pattern, selectedFiles) {
         runCatching { SmartRenameEngine.buildPlan(selectedFiles.map { it.parentPath to it.name }, pattern) }
     }
@@ -489,8 +497,22 @@ private fun FileToolsScreen(onBack: () -> Unit) {
             Divider()
             ToolPanel {
             Text("۱. فایل‌های همه پوشه‌ها — ${files.size}", fontWeight = FontWeight.Bold)
+            OutlinedTextField(
+                value = fileSearch, onValueChange = { fileSearch = it }, modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("جست‌وجوی نام یا مسیر فایل…") }, singleLine = true,
+                shape = RoundedCornerShape(14.dp)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                FilterChip(selected = imagesOnly, onClick = { imagesOnly = !imagesOnly }, label = { Text("فقط تصاویر") })
+                FilterChip(selected = largestFirst, onClick = { largestFirst = !largestFirst }, label = { Text("حجم بیشتر اول") })
+                Text("${visibleFiles.size} نتیجه", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { selected = selected + visibleFiles.map { it.key } }) { Text("انتخاب نتایج") }
+                TextButton(onClick = { selected = selected - visibleFiles.map { it.key }.toSet() }) { Text("لغو انتخاب نتایج") }
+            }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                files.forEach { file ->
+                visibleFiles.forEach { file ->
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         Checkbox(checked = file.key in selected, onCheckedChange = { checked ->
                             selected = if (checked) selected + file.key else selected - file.key
