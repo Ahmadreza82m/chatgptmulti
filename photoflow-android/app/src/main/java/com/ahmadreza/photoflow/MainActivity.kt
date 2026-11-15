@@ -200,7 +200,14 @@ private fun PhotoFlowApp() {
 @Composable
 private fun ProjectPage(originalsTree: Uri?, outputsTree: Uri?, destinationTree: Uri?, originalCount: Int, outputCount: Int,
     status: String, busy: Boolean, onPick: (PickTarget) -> Unit, onScan: () -> Unit) {
+    val context = LocalContext.current
+
     Text("فضای کاری", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+    Button(
+        onClick = { context.startActivity(Intent(context, FileToolsActivity::class.java)) },
+        modifier = Modifier.fillMaxWidth()
+    ) { Text("مدیریت پیشرفته فایل‌ها · قابلیت‌های ۱ تا ۶") }
+
     Spacer(Modifier.height(10.dp))
     FolderCard("عکس‌های اصلی", originalsTree, originalCount, "پوشه‌ای که عکس‌های اولیه داخل آن هستند") { onPick(PickTarget.ORIGINALS) }
     FolderCard("خروجی‌های Gemini", outputsTree, outputCount, "پوشه‌ای که نسخه‌های باکیفیت در آن ذخیره شده‌اند") { onPick(PickTarget.OUTPUTS) }
