@@ -137,7 +137,7 @@ private object FileOperations {
             require(!collision) { "فایلی با نام «$targetName» از قبل در پوشه وجود دارد." }
         }
 
-        data class Staged(val file: ManagedFile, val document: DocumentFile, val tempName: String, val targetName: String)
+        data class Staged(val file: ManagedFile, val tempName: String, val targetName: String)
         val staged = mutableListOf<Staged>()
         try {
             planned.forEachIndexed { index, (file, targetName) ->
@@ -145,12 +145,19 @@ private object FileOperations {
                     ?: error("فایل پیدا نشد: ${file.relativePath}")
                 val tempName = ".__photoflow_tmp_${System.nanoTime()}_$index"
                 check(source.renameTo(tempName)) { "آماده‌سازی تغییر نام ناموفق بود: ${file.name}" }
+                // Track the successful rename immediately. If SAF cannot resolve the new
+                // DocumentFile handle, rollback can still find the temp name in the parent.
+                staged += Staged(file, tempName, targetName)
                 val tempDoc = resolveParent(context, file.rootUri, file.parentPath)?.findFile(tempName)
                     ?: error("فایل موقت پیدا نشد: ${file.name}")
-                staged += Staged(file, tempDoc, tempName, targetName)
+                check(tempDoc.isFile) { "فایل موقت معتبر نیست: ${file.name}" }
             }
             staged.forEach { item ->
-                check(item.document.renameTo(item.targetName)) {
+                val parent = resolveParent(context, item.file.rootUri, item.file.parentPath)
+                    ?: error("پوشه فایل پیدا نشد: ${item.file.parentPath}")
+                val tempDoc = parent.findFile(item.tempName)
+                    ?: error("فایل موقت برای تغییر نام پیدا نشد: ${item.file.name}")
+                check(tempDoc.renameTo(item.targetName)) {
                     "تغییر نام به «${item.targetName}» ناموفق بود."
                 }
             }
