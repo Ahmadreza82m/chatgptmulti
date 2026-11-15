@@ -176,8 +176,7 @@ private object LibraryOps {
         completed
     }
 
-    private fun calculateSample(width: Int, height: Int): Int {
-        var sample = 1
+    private fun calculateSample(width: Int, height: Int): Int {        var sample = 1
         while (width / sample > 4096 || height / sample > 4096) sample *= 2
         return sample
     }
@@ -356,8 +355,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                             OutlinedButton(onClick = { catExpanded = true }) { Text(categoryFilter, maxLines = 1) }
                             DropdownMenu(expanded = catExpanded, onDismissRequest = { catExpanded = false }) {
                                 (listOf("همه دسته‌ها") + categories).forEach { cat ->
-                                    DropdownMenuItem(text = { Text(cat) }, onClick = { categoryFilter = cat; catExpanded = false })
-                                }
+                                    DropdownMenuItem(text = { Text(cat) }, onClick = { categoryFilter = cat; catExpanded = false })                                }
                             }
                         }
                     }
@@ -415,13 +413,23 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                         tags = prefs.getStringSet("tags:${encodeKey(file.key)}", emptySet()).orEmpty(),
                         onSelect = { checked -> selected = if (checked) selected + file.key else selected - file.key },
                         onFavorite = {
-                            favoriteKeys = if (file.key in favoriteKeys) favoriteKeys - file.key else favoriteKeys + file.key
+                            val before = file.key in favoriteKeys
+                            favoriteKeys = if (before) favoriteKeys - file.key else favoriteKeys + file.key
                             prefs.edit().putStringSet("library_favorites", favoriteKeys).apply()
+                            LibraryAudit.record(prefs, "favorite", file.key, before.toString(), (!before).toString())
                         },
-                        onMarked = {                            markedKeys = if (file.key in markedKeys) markedKeys - file.key else markedKeys + file.key
+                        onMarked = {
+                            val before = file.key in markedKeys
+                            markedKeys = if (before) markedKeys - file.key else markedKeys + file.key
                             prefs.edit().putStringSet("library_marked", markedKeys).apply()
+                            LibraryAudit.record(prefs, "marked", file.key, before.toString(), (!before).toString())
                         },
-                        onCategory = { cat -> prefs.edit().putString("category:${encodeKey(file.key)}", cat).apply(); status = "دسته فایل به «$cat» تغییر کرد." },
+                        onCategory = { cat ->
+                            val before = prefs.getString("category:${encodeKey(file.key)}", "بدون دسته") ?: "بدون دسته"
+                            prefs.edit().putString("category:${encodeKey(file.key)}", cat).apply()
+                            LibraryAudit.record(prefs, "category", file.key, before, cat)
+                            status = "دسته فایل به «$cat» تغییر کرد."
+                        },
                         onTags = {
                             tagTarget = file
                             tagText = prefs.getStringSet("tags:${encodeKey(file.key)}", emptySet()).orEmpty().joinToString(", ")
@@ -462,11 +470,59 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
             } },
             confirmButton = { TextButton(onClick = {
                 val tags = tagText.split(',', '،').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                val oldTags = prefs.getStringSet("tags:${encodeKey(file.key)}", emptySet()).orEmpty().sorted().joinToString("\n")
+                val newTags = tags.sorted().joinToString("\n")
                 prefs.edit().putStringSet("tags:${encodeKey(file.key)}", tags).apply()
+                if (oldTags != newTags) LibraryAudit.record(prefs, "tags", file.key, oldTags, newTags)
                 tagTarget = null
             }) { Text("ذخیره برچسب‌ها") } },
             dismissButton = { TextButton(onClick = { tagTarget = null }) { Text("انصراف") } }
         )
+    }
+
+
+    if (showHistoryDialog) {
+        val entries = LibraryAudit.history(prefs)
+        AlertDialog(onDismissRequest = { showHistoryDialog = false }, title = { Text("تاریخچه عملیات") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("بازگردانی فعلاً برای علاقه‌مندی، علامت فایل، دسته و برچسب فعال است. عملیات جابه‌جایی یا حذف فایل در این نسخه قابل بازگردانی نیست.")
+                if (entries.isEmpty()) Text("هنوز تغییری ثبت نشده است.")
+                else entries.take(10).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                Text("حداکثر ۱۰۰ تغییر اخیر نگهداری می‌شود.", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+            } },
+            confirmButton = { TextButton(onClick = {
+                if (LibraryAudit.undo(prefs)) {
+                    favoriteKeys = prefs.getStringSet("library_favorites", emptySet()).orEmpty()
+                    markedKeys = prefs.getStringSet("library_marked", emptySet()).orEmpty()
+                    status = "آخرین تغییر قابل‌بازگشت برگردانده شد."
+                } else status = "تغییری برای بازگردانی وجود ندارد."
+                showHistoryDialog = false
+            }) { Text("بازگردانی آخرین تغییر") } },
+            dismissButton = { TextButton(onClick = { showHistoryDialog = false }) { Text("بستن") } })
+    }
+    if (showErrorsDialog) {
+        val errors = LibraryAudit.errors(prefs)
+        AlertDialog(onDismissRequest = { showErrorsDialog = false }, title = { Text("گزارش خطاها") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (errors.isEmpty()) Text("هنوز خطایی ثبت نشده است.")
+                else errors.take(12).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
+                Text("حداکثر ۵۰ خطای اخیر ذخیره می‌شود.", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+            } },
+            confirmButton = { TextButton(onClick = { showErrorsDialog = false }) { Text("بستن") } })
+    }
+    if (showHealthDialog) {
+        val readable = roots.count { root -> runCatching {
+            DocumentFile.fromTreeUri(context, root.uri)?.canRead() == true
+        }.getOrDefault(false) }
+        AlertDialog(onDismissRequest = { showHealthDialog = false }, title = { Text("سلامت کتابخانه") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("پوشه‌های ثبت‌شده: ${roots.size}")
+                Text("پوشه‌های قابل‌خواندن: $readable")
+                Text("فایل‌های اسکن‌شده: ${files.size}")
+                Text("حجم فایل‌های اسکن‌شده: ${shortSize(totalBytes)}")
+                Text(if (readable == roots.size) "وضعیت دسترسی‌ها مناسب است." else "یک یا چند پوشه در دسترس نیستند؛ مجوز آن‌ها را دوباره بررسی کن.")
+            } },
+            confirmButton = { TextButton(onClick = { showHealthDialog = false }) { Text("بستن") } })
     }
 
     if (showConvertDialog) {
@@ -497,7 +553,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                         status = "${count} تصویر پردازش و به‌صورت نسخه جدید ذخیره شد."
                         files = LibraryOps.scan(context, roots)
                         selected = emptySet()
-                    } catch (e: Exception) { status = e.message ?: "پردازش تصاویر ناموفق بود." }
+                    } catch (e: Exception) { status = e.message ?: "پردازش تصاویر ناموفق بود."; LibraryAudit.logError(prefs, status) }
                     busy = false
                 }
             }) { Text("شروع پردازش") } },
@@ -536,8 +592,7 @@ private fun LibraryFileCard(
             Text(file.path, color = Color(0xFF777D95), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Box {
-                    AssistChip(onClick = { menu = true }, label = { Text(category) })
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    AssistChip(onClick = { menu = true }, label = { Text(category) })                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(text = { Text("بدون دسته") }, onClick = { onCategory("بدون دسته"); menu = false })
                         categories.filter { it != "بدون دسته" }.forEach { cat ->
                             DropdownMenuItem(text = { Text(cat) }, onClick = { onCategory(cat); menu = false })
