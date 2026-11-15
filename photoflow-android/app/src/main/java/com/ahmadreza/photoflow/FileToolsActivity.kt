@@ -471,7 +471,10 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                     } catch (e: Exception) { status = e.message ?: "بررسی تصاویر مشابه ناموفق بود." }
                     busy = false
                 }
-            }, enabled = files.count { it.mime.startsWith("image/") } > 1 && !busy) {
+            }, enabled = files.count { file ->
+                file.mime.startsWith("image/") || file.name.substringAfterLast('.', "").lowercase() in
+                    setOf("jpg", "jpeg", "png", "webp", "bmp", "gif", "heic", "heif")
+            } > 1 && !busy) {
                 Text(if (busy) "در حال تحلیل تصاویر…" else "تحلیل تصاویر مشابه با pHash")
             }
             similarGroups.forEachIndexed { index, group ->
