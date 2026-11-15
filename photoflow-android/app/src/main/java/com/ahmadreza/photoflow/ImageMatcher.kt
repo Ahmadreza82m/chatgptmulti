@@ -51,22 +51,21 @@ object ImageMatcher {
                 if (outputSignature == null || originals.isEmpty()) {
                     AutomaticMatch(output, null, null)
                 } else {
-                    val best = originals.mapNotNull { original ->
+                    val ranked = originals.mapNotNull { original ->
                         val signature =
                             signatureCache[cacheKey(original.uri, original.size.toString())]
                                 ?: return@mapNotNull null
-                        val distance = java.lang.Long.bitCount(
-                            signature.pHash xor outputSignature.pHash
-                        )
+                        val distance = java.lang.Long.bitCount(signature.pHash xor outputSignature.pHash)
                         original to distance
-                    }.minByOrNull { it.second }
+                    }.sortedBy { it.second }
 
+                    val best = ranked.firstOrNull()
                     if (best == null) {
                         AutomaticMatch(output, null, null)
                     } else {
-                        val result = score(best.second)
-                        // Keep the original matching behavior: assign the closest original
-                        // whenever it falls inside the established review threshold.
+                        val runnerUp = ranked.getOrNull(1)?.second
+                        val margin = runnerUp?.minus(best.second)
+                        val result = score(best.second, runnerUp, margin)
                         AutomaticMatch(
                             output,
                             best.first.takeIf { result.level != MatchLevel.UNMATCHED },
@@ -78,10 +77,11 @@ object ImageMatcher {
         }
     }
 
-    private fun score(distance: Int): MatchScore {
+    private fun score(distance: Int, runnerUpDistance: Int? = null, margin: Int? = null): MatchScore {
         val confidence = (1f - distance / 64f).coerceIn(0f, 1f)
+        val ambiguous = margin != null && margin < 3
         val level = when {
-            distance <= 9 -> MatchLevel.HIGH
+            distance <= 9 && !ambiguous -> MatchLevel.HIGH
             distance <= 17 -> MatchLevel.REVIEW
             else -> MatchLevel.UNMATCHED
         }
@@ -90,8 +90,55 @@ object ImageMatcher {
             pHashDistance = distance,
             dHashDistance = 0,
             confidence = confidence,
-            level = level
+            level = level,
+            runnerUpDistance = runnerUpDistance,
+            margin = margin
         )
+    }
+
+    /**
+     * Groups visually similar images using perceptual hashes. This is intentionally
+     * separate from byte-identical SHA-256 duplicate detection: resized/recompressed
+     * images can be similar without being the same file.
+     */
+    suspend fun findSimilarGroups(
+        resolver: ContentResolver,
+        photos: List<PhotoFile>,
+        maxDistance: Int = 8
+    ): List<List<PhotoFile>> {
+        if (photos.size < 2) return emptyList()
+        val signatures = mutableListOf<Pair<PhotoFile, ImageSignature>>()
+        photos.distinctBy { it.uri.toString() }.forEach { photo ->
+            val signature = signatureFor(resolver, photo.uri, photo.size.toString())
+            if (signature != null) signatures += photo to signature
+        }
+        if (signatures.size < 2) return emptyList()
+        return withContext(Dispatchers.Default) {
+            val parent = IntArray(signatures.size) { it }
+            fun root(index: Int): Int {
+                var current = index
+                while (parent[current] != current) {
+                    parent[current] = parent[parent[current]]
+                    current = parent[current]
+                }
+                return current
+            }
+            fun join(a: Int, b: Int) {
+                val ra = root(a)
+                val rb = root(b)
+                if (ra != rb) parent[rb] = ra
+            }
+            for (i in 0 until signatures.size) {
+                for (j in i + 1 until signatures.size) {
+                    val distance = java.lang.Long.bitCount(signatures[i].second.pHash xor signatures[j].second.pHash)
+                    if (distance <= maxDistance) join(i, j)
+                }
+            }
+            signatures.indices.groupBy { root(it) }.values
+                .filter { it.size > 1 }
+                .map { group -> group.map { signatures[it].first } }
+                .sortedByDescending { it.size }
+        }
     }
 
     private fun cacheKey(uri: Uri, token: String) = "${uri}#${token}"
