@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     PhotoReviveScreen(
+                        appContext = this,
                         onSave = { bitmap -> saveBitmap(bitmap) }
                     )
                 }
@@ -87,7 +88,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun PhotoReviveScreen(onSave: (Bitmap) -> Boolean) {
+private fun PhotoReviveScreen(appContext: android.content.Context, onSave: (Bitmap) -> Boolean) {
     val selected = remember { mutableStateListOf<Uri>() }
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
@@ -140,7 +141,7 @@ private fun PhotoReviveScreen(onSave: (Bitmap) -> Boolean) {
                         message = "در حال پردازش ${index + 1} از $total ..."
                         val result = withContext(Dispatchers.IO) {
                             try {
-                                val bitmap = contentResolverFor(uri)
+                                val bitmap = contentResolverFor(appContext, uri)
                                 if (bitmap == null) false
                                 else ImageEnhancer.enhance(bitmap).let(onSave)
                             } catch (_: Exception) {
@@ -183,15 +184,9 @@ private fun PhotoReviveScreen(onSave: (Bitmap) -> Boolean) {
     }
 }
 
-private fun contentResolverFor(uri: Uri): Bitmap? {
+private fun contentResolverFor(context: android.content.Context, uri: Uri): Bitmap? {
     // Resolve through the URI's content provider; no broad storage permission is needed.
     return runCatching {
-        val context = AppContextHolder.context ?: return null
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
     }.getOrNull()
-}
-
-/** Set by the activity before Compose content is created. */
-private object AppContextHolder {
-    var context: android.content.Context? = null
 }
