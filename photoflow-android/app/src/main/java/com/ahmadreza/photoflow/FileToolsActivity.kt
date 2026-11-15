@@ -155,23 +155,10 @@ private object FileOperations {
                 }
             }
         } catch (error: Exception) {
-            staged.forEachIndexed { index, item ->
-                runCatching {
-                    val parent = resolveParent(context, item.file.rootUri, item.file.parentPath)
-                    val current = parent?.findFile(item.targetName)
-                    current?.renameTo(".__photoflow_rollback_${System.nanoTime()}_$index")
-                }
-            }
+            // Every selected file was staged before final names are applied.
+            // The original names are therefore free and can be restored directly.
             staged.forEach { item ->
-                runCatching {
-                    val parent = resolveParent(context, item.file.rootUri, item.file.parentPath)
-                    val rollback = parent?.listFiles()?.firstOrNull {
-                        it.name?.startsWith(".__photoflow_rollback_") == true &&
-                            it.length() == item.file.size
-                    }
-                    val stagedDoc = parent?.findFile(item.tempName)
-                    (rollback ?: stagedDoc)?.renameTo(item.file.name)
-                }
+                runCatching { item.document.renameTo(item.file.name) }
             }
             throw error
         }
