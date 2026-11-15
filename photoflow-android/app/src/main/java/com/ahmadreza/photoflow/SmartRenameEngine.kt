@@ -45,17 +45,17 @@ object SmartRenameEngine {
     }
 
     fun buildPlan(
-        files: List<Triple<String, String, String>>,
+        files: List<Pair<String, String>>,
         pattern: String
     ): List<RenameItem> {
         require(files.isNotEmpty()) { "ابتدا فایل‌ها را انتخاب کن." }
         require(pattern.isNotBlank()) { "الگوی نام‌گذاری خالی است." }
 
-        val cleaned = files.map { (_, _, name) -> cleanStem(name).ifBlank { name.substringBeforeLast('.', name) } }
+        val cleaned = files.map { (_, name) -> cleanStem(name).ifBlank { name.substringBeforeLast('.', name) } }
         val totals = cleaned.groupingBy { it.lowercase() }.eachCount()
         val seen = mutableMapOf<String, Int>()
 
-        val planned = files.mapIndexed { index, (parentPath, _, oldName) ->
+        val planned = files.mapIndexed { index, (parentPath, oldName) ->
             val ext = oldName.substringAfterLast('.', "").takeIf { '.' in oldName }.orEmpty()
             val originalStem = oldName.substringBeforeLast('.', oldName)
             val clean = cleaned[index]
@@ -72,7 +72,7 @@ object SmartRenameEngine {
                 .replace("{autoIndex}", autoIndex)
                 .replace("{folder}", parentPath.substringAfterLast('/').ifBlank { "پوشه" })
                 .replace("{ext}", ext)
-                .replace(Regex("[\\\\/:*?""<>|]"), " ")
+                .replace(Regex("[\\\\/:*?\\\"<>|]"), " ")
                 .replace(Regex("\\s+"), " ")
                 .trim()
 
