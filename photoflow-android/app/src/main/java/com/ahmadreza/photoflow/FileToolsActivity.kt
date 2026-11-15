@@ -121,29 +121,14 @@ private object FileOperations {
         pattern: String
     ): Int = withContext(Dispatchers.IO) {
         require(selected.isNotEmpty()) { "ابتدا فایل‌ها را انتخاب کن." }
-        require(pattern.isNotBlank()) { "الگوی نام‌گذاری خالی است." }
-        val all = selected.mapIndexed { index, file ->
-            val ext = file.name.substringAfterLast('.', "").takeIf { '.' in file.name }.orEmpty()
-            val base = file.name.substringBeforeLast('.', file.name)
-            var newName = pattern.replace("{name}", base)
-                .replace("{index}", (index + 1).toString().padStart(2, '0'))
-                .replace("{ext}", ext)
-                .replace(Regex("[\\\\/:*?\"<>|]"), "_")
-            if (ext.isNotEmpty() && !pattern.contains("{ext}") && !newName.endsWith(".$ext", true)) newName += ".$ext"
-            file to newName
-        }
-        require(all.map { it.second.lowercase() }.distinct().size == all.size) {
-            "الگوی نام‌گذاری برای چند فایل نام یکسان ساخته است."
-        }
+        val plan = SmartRenameEngine.buildPlan(selected.map { it.parentPath to it.name }, pattern)
+        require(plan.size == selected.size) { "تعداد نام‌های پیشنهادی با فایل‌ها یکسان نیست." }
+
         val selectedKeys = selected.map { it.key }.toSet()
-        val targetKeys = all.map { (file, name) ->
-            (file.rootUri.toString() + "|" + file.parentPath + "|" + name).lowercase()
-        }
-        require(targetKeys.distinct().size == targetKeys.size) {
-            "دو فایل در یک پوشه نمی‌توانند نام یکسان بگیرند."
-        }
-        all.forEach { (file, targetName) ->
-            val parent = resolveParent(context, file.rootUri, file.parentPath) ?: error("پوشه فایل پیدا نشد.")
+        val planned = selected.zip(plan).map { (file, item) -> file to item.newName }
+        planned.forEach { (file, targetName) ->
+            val parent = resolveParent(context, file.rootUri, file.parentPath)
+                ?: error("پوشه فایل پیدا نشد: ${file.parentPath}")
             val collision = parent.listFiles().any { child ->
                 val childPath = (file.parentPath + "/" + (child.name ?: "")).trim('/')
                 val childKey = file.rootUri.toString() + "|" + childPath
@@ -151,23 +136,42 @@ private object FileOperations {
             }
             require(!collision) { "فایلی با نام «$targetName» از قبل در پوشه وجود دارد." }
         }
-        val staged = mutableListOf<Triple<ManagedFile, DocumentFile, String>>()
-        all.forEachIndexed { index, (file, targetName) ->
-            val doc = resolve(context, file.rootUri, file.relativePath) ?: error("فایل پیدا نشد: ${file.name}")
-            val temp = ".__photoflow_tmp_${System.nanoTime()}_$index"
-            check(doc.renameTo(temp)) { "تغییر نام موقت فایل ناموفق بود: ${file.name}" }
-            staged += Triple(file, resolveParent(context, file.rootUri, file.parentPath)
-                ?.findFile(temp) ?: error("فایل موقت پیدا نشد."), targetName)
-        }
-        var completed = 0
+
+        data class Staged(val file: ManagedFile, val document: DocumentFile, val tempName: String, val targetName: String)
+        val staged = mutableListOf<Staged>()
         try {
-            staged.forEach { (_, doc, targetName) ->
-                check(doc.renameTo(targetName)) { "تغییر نام به «$targetName» ناموفق بود." }
-                completed++
+            planned.forEachIndexed { index, (file, targetName) ->
+                val source = resolve(context, file.rootUri, file.relativePath)
+                    ?: error("فایل پیدا نشد: ${file.relativePath}")
+                val tempName = ".__photoflow_tmp_${System.nanoTime()}_$index"
+                check(source.renameTo(tempName)) { "آماده‌سازی تغییر نام ناموفق بود: ${file.name}" }
+                val tempDoc = resolveParent(context, file.rootUri, file.parentPath)?.findFile(tempName)
+                    ?: error("فایل موقت پیدا نشد: ${file.name}")
+                staged += Staged(file, tempDoc, tempName, targetName)
+            }
+            staged.forEach { item ->
+                check(item.document.renameTo(item.targetName)) {
+                    "تغییر نام به «${item.targetName}» ناموفق بود."
+                }
             }
         } catch (error: Exception) {
-            staged.drop(completed).forEachIndexed { index, (old, doc, _) ->
-                runCatching { doc.renameTo(old.name) }
+            staged.forEachIndexed { index, item ->
+                runCatching {
+                    val parent = resolveParent(context, item.file.rootUri, item.file.parentPath)
+                    val current = parent?.findFile(item.targetName)
+                    current?.renameTo(".__photoflow_rollback_${System.nanoTime()}_$index")
+                }
+            }
+            staged.forEach { item ->
+                runCatching {
+                    val parent = resolveParent(context, item.file.rootUri, item.file.parentPath)
+                    val rollback = parent?.listFiles()?.firstOrNull {
+                        it.name?.startsWith(".__photoflow_rollback_") == true &&
+                            it.length() == item.file.size
+                    }
+                    val stagedDoc = parent?.findFile(item.tempName)
+                    (rollback ?: stagedDoc)?.renameTo(item.file.name)
+                }
             }
             throw error
         }
@@ -244,11 +248,12 @@ private fun FileToolsScreen(onBack: () -> Unit) {
     var destination by remember { mutableStateOf<Uri?>(null) }
     var leftRoot by remember { mutableStateOf<Uri?>(null) }
     var rightRoot by remember { mutableStateOf<Uri?>(null) }
-    var pattern by remember { mutableStateOf("{name}_{index}.{ext}") }
+    var pattern by remember { mutableStateOf("{clean}{autoIndex}.{ext}") }
     var status by remember { mutableStateOf("چند پوشه اضافه کن تا ابزارهای مدیریت فایل فعال شوند.") }
     var comparison by remember { mutableStateOf<FolderComparison?>(null) }
     var duplicates by remember { mutableStateOf<List<List<ManagedFile>>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
+    val selectedFiles = files.filter { it.key in selected }
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -335,16 +340,29 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                 }
             }
             Divider()
-            Text("۳. تغییر نام گروهی", fontWeight = FontWeight.Bold)
+            Text("۳. نام‌گذاری هوشمند و گروهی", fontWeight = FontWeight.Bold)
+            Text("اسکن فایل‌ها به‌صورت بازگشتی انجام می‌شود؛ یعنی تمام زیرپوشه‌ها و زیرپوشه‌های تو‌در‌تو هم بررسی می‌شوند.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(
                 value = pattern, onValueChange = { pattern = it }, modifier = Modifier.fillMaxWidth(),
-                label = { Text("الگو: {name} نام قبلی، {index} شماره، {ext} پسوند") }, singleLine = true
+                label = { Text("الگوی نام‌گذاری") }, singleLine = true
             )
+            Text("قالب‌های آماده", fontWeight = FontWeight.SemiBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = { pattern = "{clean}{autoIndex}.{ext}" }) { Text("نام تمیز + شماره خودکار") }
+                TextButton(onClick = { pattern = "{index} - {clean}.{ext}" }) { Text("شماره اول") }
+                TextButton(onClick = { pattern = "{clean} - {index}.{ext}" }) { Text("شماره آخر") }
+            }
+            Text("راهنما: {clean}=حذف پیشوند عددی، {autoIndex}=شماره فقط برای موارد تکراری، {index}=شماره دو رقمی همه فایل‌ها، {number}=شماره ساده، {ext}=پسوند، {folder}=نام زیرپوشه.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text("انتخاب‌شده: ${selected.size}", style = MaterialTheme.typography.bodySmall)
-            files.filter { it.key in selected }.take(4).forEachIndexed { index, file ->
-                Text("پیش‌نمایش: ${file.name}  ←  ${previewRename(file.name, pattern, index)}",
+            selectedFiles.take(8).forEachIndexed { index, file ->
+                val clean = SmartRenameEngine.cleanStem(file.name).lowercase()
+                val occurrence = selectedFiles.take(index + 1).count { SmartRenameEngine.cleanStem(it.name).lowercase() == clean }
+                val total = selectedFiles.count { SmartRenameEngine.cleanStem(it.name).lowercase() == clean }
+                Text("پیش‌نمایش: ${file.relativePath}  ←  ${SmartRenameEngine.previewName(file.name, file.parentPath, pattern, index, occurrence, total)}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
@@ -359,7 +377,7 @@ private fun FileToolsScreen(onBack: () -> Unit) {
                         busy = false
                     }
                 }, enabled = selected.isNotEmpty() && !busy) { Text("اجرای تغییر نام") }
-                TextButton(onClick = { selected = files.map { it.key }.toSet() }) { Text("انتخاب همه") }
+                TextButton(onClick = { selected = files.map { it.key }.toSet() }) { Text("انتخاب همه فایل‌های همه زیرپوشه‌ها") }
                 TextButton(onClick = { selected = emptySet() }) { Text("پاک‌کردن انتخاب") }
             }
             Divider()
@@ -456,13 +474,3 @@ private fun formatSize(size: Long): String = when {
     else -> "%.2f GB".format(size / (1024.0 * 1024.0 * 1024.0))
 }
 
-private fun previewRename(name: String, pattern: String, index: Int): String {
-    val ext = name.substringAfterLast('.', "").takeIf { '.' in name }.orEmpty()
-    val base = name.substringBeforeLast('.', name)
-    var result = pattern.replace("{name}", base)
-        .replace("{index}", (index + 1).toString().padStart(2, '0'))
-        .replace("{ext}", ext)
-        .replace(Regex("[\\\\/:*?\"<>|]"), "_")
-    if (ext.isNotEmpty() && !pattern.contains("{ext}") && !result.endsWith(".$ext", true)) result += ".$ext"
-    return result
-}
