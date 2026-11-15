@@ -1,0 +1,39 @@
+name: PhotoFlow Android Build
+on:
+  push:
+    branches: [ "photo-flow-android" ]
+    paths:
+      - "photoflow-android/**"
+      - ".github/workflows/photoflow-android.yml"
+  pull_request:
+    paths:
+      - "photoflow-android/**"
+      - ".github/workflows/photoflow-android.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build PhotoFlow debug APK
+        working-directory: photoflow-android
+        run: gradle --no-daemon assembleDebug
+      - name: Upload PhotoFlow APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoFlow-Android-debug
+          path: photoflow-android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
