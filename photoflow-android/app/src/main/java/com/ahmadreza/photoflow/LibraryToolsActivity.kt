@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -277,12 +278,12 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
     val favoriteCount = files.count { it.key in favoriteKeys }
 
     MaterialTheme(colorScheme = darkColorScheme(
-        primary = Color(0xFF9B8CFF), secondary = Color(0xFF54D6C8),
-        background = Color(0xFF0B0D14), surface = Color(0xFF171A26),
-        surfaceVariant = Color(0xFF222638), onBackground = Color(0xFFF4F2FF),
+        primary = Color(0xFFC7F36B), secondary = Color(0xFF8DE0D0),
+        background = Color(0xFF080C12), surface = Color(0xFF121A24),
+        surfaceVariant = Color(0xFF1D2936), onBackground = Color(0xFFF4F2FF),
         onSurface = Color(0xFFF4F2FF)
     )) {
-        Scaffold(containerColor = Color(0xFF0B0D14), topBar = {
+        Scaffold(containerColor = Color(0xFF080C12), topBar = {
             TopAppBar(
                 title = { Column {
                     Text("کتابخانه هوشمند", fontWeight = FontWeight.Bold)
@@ -290,7 +291,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                 } },
                 navigationIcon = { TextButton(onClick = onBack) { Text("بازگشت") } },
                 actions = { TextButton(onClick = { scanNow() }, enabled = !busy) { Text(if (busy) "…" else "اسکن ↻") } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF10131D))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0E151E))
             )
         }) { padding ->
             LazyColumn(
@@ -301,11 +302,11 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                 item {
                     Card(shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                         modifier = Modifier.fillMaxWidth()) {
-                        Box(Modifier.background(Brush.linearGradient(listOf(Color(0xFF29234B), Color(0xFF173B48), Color(0xFF171A2B)))).padding(18.dp)) {
+                        Box(Modifier.background(Brush.linearGradient(listOf(Color(0xFF263A4C), Color(0xFF173B3B), Color(0xFF171A2B)))).padding(18.dp)) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("فضای فایل‌های تو", color = Color(0xFFB9B4FF), style = MaterialTheme.typography.labelLarge)
                                 Text("${files.size} فایل شناسایی‌شده", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-                Text("${markedKeys.size} فایل علامت‌گذاری‌شده", color = Color(0xFF9B8CFF), style = MaterialTheme.typography.labelMedium)
+                Text("${markedKeys.size} فایل علامت‌گذاری‌شده", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelMedium)
                                 Text("ذخیره خودکار روشن است • داده‌ها روی همین دستگاه ذخیره می‌شوند", color = Color(0xFFAAA8BE), style = MaterialTheme.typography.labelSmall)
                                 Text("بدون تغییر در فایل‌های اصلی؛ ابزارها روی نسخه خروجی کار می‌کنند.", color = Color(0xFFD0D1E0), style = MaterialTheme.typography.bodySmall)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -332,7 +333,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                 item {
                     OutlinedTextField(value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("جست‌وجوی نام یا مسیر فایل…") }, singleLine = true, shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF9B8CFF), unfocusedBorderColor = Color(0xFF34384B)))
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFFC7F36B), unfocusedBorderColor = Color(0xFF34384B)))
                 }
                 item {
                     OutlinedTextField(value = tagSearch, onValueChange = { tagSearch = it }, modifier = Modifier.fillMaxWidth(),
@@ -340,12 +341,12 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                 }
                 item {
                     Text("فیلترهای سریع", fontWeight = FontWeight.Bold)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
                         LibraryKind.values().forEach { item ->
                             FilterChip(selected = kind == item, onClick = { kind = item }, label = { Text(item.title) })
                         }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.horizontalScroll(rememberScrollState())) {
                         FilterChip(selected = favoritesOnly, onClick = { favoritesOnly = !favoritesOnly }, label = { Text("★ علاقه‌مندی‌ها") })
                         Spacer(Modifier.width(6.dp))
                         FilterChip(selected = markedOnly, onClick = { markedOnly = !markedOnly }, label = { Text("⚑ علامت‌گذاری‌شده‌ها") })
@@ -363,7 +364,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                     Text("${filtered.size} نتیجه از ${files.size} فایل", color = Color(0xFFAAA8BE), style = MaterialTheme.typography.labelSmall)
                 }
                 item {
-                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF171A26)), shape = RoundedCornerShape(20.dp)) {
+                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF121A24)), shape = RoundedCornerShape(20.dp)) {
                         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                             Text("ابزارهای گروهی", fontWeight = FontWeight.Bold)
                             Text("${selected.size} فایل انتخاب شده", color = Color(0xFFAAA8BE), style = MaterialTheme.typography.labelSmall)
@@ -398,7 +399,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                     }
                 }
                 if (filtered.isEmpty()) item {
-                    Surface(color = Color(0xFF171A26), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+                    Surface(color = Color(0xFF121A24), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
                         Text(if (files.isEmpty()) "هنوز فایلی بارگذاری نشده؛ یک پوشه اضافه کن." else "با این فیلتر چیزی پیدا نشد.",
                             modifier = Modifier.padding(20.dp), color = Color(0xFFAAA8BE))
                     }
@@ -579,7 +580,7 @@ private fun LibraryFileCard(
     onSelect: (Boolean) -> Unit, onFavorite: () -> Unit, onMarked: () -> Unit, onCategory: (String) -> Unit, onTags: () -> Unit
 ) {
     var menu by remember { mutableStateOf(false) }
-    Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF171A26))) {
+    Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF121A24))) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = selected, onCheckedChange = onSelect)
@@ -588,7 +589,7 @@ private fun LibraryFileCard(
                     Text("${file.mime.ifBlank { "نوع نامشخص" }} • ${shortSize(file.size)}", color = Color(0xFFAAA8BE), style = MaterialTheme.typography.labelSmall)
                 }
                 IconButton(onClick = onFavorite) { Text(if (favorite) "★" else "☆", color = if (favorite) Color(0xFFFFCB70) else Color(0xFFAAA8BE)) }
-                IconButton(onClick = onMarked) { Text(if (marked) "⚑" else "⚐", color = if (marked) Color(0xFF9B8CFF) else Color(0xFFAAA8BE)) }
+                IconButton(onClick = onMarked) { Text(if (marked) "⚑" else "⚐", color = if (marked) Color(0xFFC7F36B) else Color(0xFFAAA8BE)) }
             }
             Text(file.path, color = Color(0xFF777D95), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -602,7 +603,7 @@ private fun LibraryFileCard(
                     }
                 }
                 OutlinedButton(onClick = onTags, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 3.dp)) { Text("برچسب‌ها") }
-                if (tags.isNotEmpty()) Text(tags.joinToString("، "), color = Color(0xFF9B8CFF), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (tags.isNotEmpty()) Text(tags.joinToString("، "), color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
