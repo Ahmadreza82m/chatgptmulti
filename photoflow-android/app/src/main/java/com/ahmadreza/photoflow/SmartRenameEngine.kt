@@ -102,7 +102,7 @@ object SmartRenameEngine {
             .replace("{autoIndex}", autoIndex)
             .replace("{folder}", parentPath.substringAfterLast('/').ifBlank { "پوشه" })
             .replace("{ext}", ext)
-            .replace(Regex("[\\\\/:*?""<>|]"), " ")
+            .replace(Regex("[\\\\/:*?\\\"<>|]"), " ")
             .replace(Regex("\\s+"), " ")
             .trim()
         if (ext.isNotBlank() && !pattern.contains("{ext}") && !result.endsWith(".$ext", true)) result += ".$ext"
