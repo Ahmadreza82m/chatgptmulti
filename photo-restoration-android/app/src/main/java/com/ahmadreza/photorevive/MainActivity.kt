@@ -72,9 +72,13 @@ class MainActivity : ComponentActivity() {
         val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
             ?: return false
         return try {
-            contentResolver.openOutputStream(uri)?.use {
+            val written = contentResolver.openOutputStream(uri)?.use {
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it)
             } ?: false
+            if (!written) {
+                contentResolver.delete(uri, null, null)
+                return false
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 values.clear()
                 values.put(MediaStore.Images.Media.IS_PENDING, 0)
