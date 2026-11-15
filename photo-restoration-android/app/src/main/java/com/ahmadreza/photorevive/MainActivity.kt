@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.size
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -173,7 +174,7 @@ private fun PhotoReviveScreen(appContext: android.content.Context, onSave: (Bitm
                         AsyncImage(
                             model = uri,
                             contentDescription = "پیش‌نمایش عکس انتخاب‌شده",
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.size(88.dp),
                             contentScale = ContentScale.Crop
                         )
                         Text(uri.lastPathSegment ?: "عکس انتخاب‌شده", modifier = Modifier.weight(2f))
