@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -95,25 +96,39 @@ private fun PhotoFlowApp() {
     }
 
     MaterialTheme(colorScheme = darkColorScheme(
-        primary = Color(0xFFB8A1FF), secondary = Color(0xFF8ED8CB),
-        background = Color(0xFF101116), surface = Color(0xFF1A1C24),
-        surfaceVariant = Color(0xFF252833), onBackground = Color(0xFFF4F2FA),
-        onSurface = Color(0xFFF4F2FA)
+        primary = Color(0xFFC7F36B), secondary = Color(0xFF8DE0D0),
+        background = Color(0xFF080C12), surface = Color(0xFF121A24),
+        surfaceVariant = Color(0xFF1D2936), onBackground = Color(0xFFF4F7F1),
+        onSurface = Color(0xFFF4F7F1)
     )) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                Column(Modifier.fillMaxWidth().background(Color(0xFF171820)).padding(horizontal = 20.dp, vertical = 16.dp)) {
-                    Text("PHOTOFLOW", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    Text("مدیریت هوشمند عکس‌ها", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("تطبیق، گروه‌بندی و آماده‌سازی خروجی", style = MaterialTheme.typography.bodySmall, color = Color.LightGray)
+                Row(
+                    Modifier.fillMaxWidth()
+                        .background(Brush.linearGradient(listOf(Color(0xFF172536), Color(0xFF102D32), Color(0xFF171A2C))))
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.size(46.dp).background(Brush.linearGradient(listOf(Color(0xFFC7F36B), Color(0xFF77D9C6))), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                        Text("P", color = Color(0xFF101711), fontWeight = FontWeight.Black, style = MaterialTheme.typography.headlineMedium)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("PHOTO FLOW  /  STUDIO", style = MaterialTheme.typography.labelMedium, color = Color(0xFFC7F36B), fontWeight = FontWeight.ExtraBold)
+                        Text("استودیوی هوشمند عکس", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color(0xFFF5F7F0))
+                        Text("مدیریت، تطبیق و سازمان‌دهی حرفه‌ای", style = MaterialTheme.typography.labelSmall, color = Color(0xFFADBCC7))
+                    }
+                    Surface(color = Color(0xFF263B3A), shape = RoundedCornerShape(50)) {
+                        Text("PRO", modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp), color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
                 }
             },
             bottomBar = {
-                NavigationBar(containerColor = Color(0xFF171820)) {
-                    NavigationBarItem(selected = page == Page.PROJECT, onClick = { page = Page.PROJECT }, icon = { Text("▦") }, label = { Text("پروژه") })
-                    NavigationBarItem(selected = page == Page.GROUPS, onClick = { page = Page.GROUPS }, icon = { Text("◎") }, label = { Text("گروه‌بندی") })
-                    NavigationBarItem(selected = page == Page.EXPORT, onClick = { page = Page.EXPORT }, icon = { Text("⇧") }, label = { Text("خروجی") })
+                NavigationBar(containerColor = Color(0xFF0E151E), contentColor = Color(0xFFC7F36B)) {
+                    NavigationBarItem(selected = page == Page.PROJECT, onClick = { page = Page.PROJECT }, icon = { Text("⌂", style = MaterialTheme.typography.titleLarge) }, label = { Text("خانه") })
+                    NavigationBarItem(selected = page == Page.GROUPS, onClick = { page = Page.GROUPS }, icon = { Text("◈", style = MaterialTheme.typography.titleLarge) }, label = { Text("تطبیق") })
+                    NavigationBarItem(selected = page == Page.EXPORT, onClick = { page = Page.EXPORT }, icon = { Text("⇧", style = MaterialTheme.typography.titleLarge) }, label = { Text("خروجی") })
                 }
             }
         ) { padding ->
@@ -201,40 +216,160 @@ private fun PhotoFlowApp() {
 private fun ProjectPage(originalsTree: Uri?, outputsTree: Uri?, destinationTree: Uri?, originalCount: Int, outputCount: Int,
     status: String, busy: Boolean, onPick: (PickTarget) -> Unit, onScan: () -> Unit) {
     val context = LocalContext.current
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
+                Box(Modifier.background(Brush.linearGradient(listOf(Color(0xFF273A49), Color(0xFF183E40), Color(0xFF292344)))).padding(20.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(color = Color(0x33C7F36B), shape = RoundedCornerShape(50)) {
+                                Text("YOUR CREATIVE WORKSPACE", modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                                    color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Text("✦", color = Color(0xFFC7F36B), style = MaterialTheme.typography.headlineMedium)
+                        }
+                        Text("تمام عکس‌هایت،\nدر یک جریان هوشمند.", style = MaterialTheme.typography.headlineMedium,
+                            color = Color.White, fontWeight = FontWeight.ExtraBold)
+                        Text("از پیدا کردن نسخه‌های مشابه تا ساخت آرشیو مرتب؛ همه‌چیز در یک فضای کاری امن و یکپارچه.",
+                            color = Color(0xFFD1DFE1), style = MaterialTheme.typography.bodyMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { context.startActivity(Intent(context, FileToolsActivity::class.java)) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC7F36B), contentColor = Color(0xFF101711)),
+                                shape = RoundedCornerShape(14.dp)) { Text("ورود به ابزارها  ↗", fontWeight = FontWeight.Bold) }
+                            OutlinedButton(onClick = onScan, enabled = !busy,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF6B8989)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                                shape = RoundedCornerShape(14.dp)) { Text(if (busy) "در حال اسکن…" else "اسکن مجدد") }
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.fillMaxWidth()) {
+                DashboardMetric("عکس‌های اصلی", originalCount.toString(), "منبع", Modifier.weight(1f))
+                DashboardMetric("نسخه‌های خروجی", outputCount.toString(), "برای تطبیق", Modifier.weight(1f))
+                DashboardMetric("پوشه‌های فعال", listOfNotNull(originalsTree, outputsTree, destinationTree).distinct().size.toString(), "فضای کاری", Modifier.weight(1f))
+            }
+        }
+        item { SectionHeading("ابزارهای حرفه‌ای", "WORKSPACE TOOLS", "همه ابزارها در دسترس و آماده استفاده") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                ToolLaunchCard("مدیریت فایل", "مرتب‌سازی، تغییر نام، کپی و انتقال", "▤",
+                    Brush.linearGradient(listOf(Color(0xFF263B4C), Color(0xFF1B2938))), Modifier.weight(1f)) {
+                    context.startActivity(Intent(context, FileToolsActivity::class.java))
+                }
+                ToolLaunchCard("کتابخانه هوشمند", "جست‌وجو، برچسب، دسته و پردازش", "◫",
+                    Brush.linearGradient(listOf(Color(0xFF293A37), Color(0xFF1D302F))), Modifier.weight(1f)) {
+                    context.startActivity(Intent(context, LibraryToolsActivity::class.java))
+                }
+            }
+        }
+        item { SectionHeading("اتصال منابع", "YOUR LIBRARIES", "پوشه‌های منبع و مقصد پروژه را مدیریت کن") }
+        item { FolderCard("عکس‌های اصلی", originalsTree, originalCount, "منبع تصاویر اولیه") { onPick(PickTarget.ORIGINALS) } }
+        item { FolderCard("خروجی‌های Gemini", outputsTree, outputCount, "نسخه‌های بهبود‌یافته و خروجی‌ها") { onPick(PickTarget.OUTPUTS) } }
+        item { FolderCard("مقصد فایل‌های مرتب‌شده", destinationTree, null, "محل ذخیره خروجی و فایل ZIP") { onPick(PickTarget.DESTINATION) } }
+        item {
+            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF121B25))) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("جریان کاری پیشنهادی", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text("3 مرحله", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall)
+                    }
+                    WorkflowStep("01", "اتصال پوشه‌ها", "منبع، خروجی و مقصد را مشخص کن", originalsTree != null && outputsTree != null)
+                    WorkflowStep("02", "تطبیق و بازبینی", "نسخه‌های مشابه را گروه‌بندی و تأیید کن", false)
+                    WorkflowStep("03", "ساخت آرشیو", "خروجی مرتب و قابل اشتراک بساز", false)
+                }
+            }
+        }
+        item {
+            Surface(color = Color(0xFF19252C), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("◈", color = Color(0xFF8DE0D0), style = MaterialTheme.typography.titleLarge)
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text("حریم خصوصی در اولویت", color = Color(0xFF8DE0D0), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                        Text("فایل‌های اصلی بدون اجازه تو حذف یا بازنویسی نمی‌شوند؛ خروجی‌ها به‌صورت کپی ساخته می‌شوند.",
+                            color = Color(0xFFB9C7CB), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+        item { StatusPanel(status) }
+    }
+}
 
-    Text("فضای کاری", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-    Button(
-        onClick = { context.startActivity(Intent(context, FileToolsActivity::class.java)) },
-        modifier = Modifier.fillMaxWidth()
-    ) { Text("مدیریت فایل‌ها · قابلیت‌های ۱ تا ۶") }
-    Spacer(Modifier.height(7.dp))
-    OutlinedButton(
-        onClick = { context.startActivity(Intent(context, LibraryToolsActivity::class.java)) },
-        modifier = Modifier.fillMaxWidth()
-    ) { Text("کتابخانه هوشمند · فیلتر، دسته‌بندی و پردازش تصویر") }
+@Composable
+private fun DashboardMetric(title: String, value: String, hint: String, modifier: Modifier = Modifier) {
+    Card(modifier, shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF141E29))) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(value, color = Color(0xFFC7F36B), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+            Text(title, color = Color(0xFFF0F3EE), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(hint, color = Color(0xFF82939F), style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
 
-    Spacer(Modifier.height(10.dp))
-    FolderCard("عکس‌های اصلی", originalsTree, originalCount, "پوشه‌ای که عکس‌های اولیه داخل آن هستند") { onPick(PickTarget.ORIGINALS) }
-    FolderCard("خروجی‌های Gemini", outputsTree, outputCount, "پوشه‌ای که نسخه‌های باکیفیت در آن ذخیره شده‌اند") { onPick(PickTarget.OUTPUTS) }
-    FolderCard("مقصد فایل‌های مرتب‌شده", destinationTree, null, "محل ساخت کپی‌های مرتب‌شده و ZIP") { onPick(PickTarget.DESTINATION) }
-    Spacer(Modifier.height(12.dp))
-    OutlinedButton(onClick = onScan, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "در حال بررسی…" else "بازخوانی پوشه‌ها") }
-    StatusPanel(status)
-    Text("فقط تصاویر داخل پوشه‌های انتخاب‌شده بررسی می‌شوند. فایل‌های اصلی جابه‌جا یا حذف نمی‌شوند.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
+@Composable
+private fun SectionHeading(title: String, eyebrow: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(eyebrow, color = Color(0xFF9BB0B7), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        Text(title, color = Color(0xFFF4F7F1), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+        Text(subtitle, color = Color(0xFF8E9DA8), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun ToolLaunchCard(title: String, subtitle: String, glyph: String, brush: Brush, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Card(modifier.clickable(onClick = onClick), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.Transparent)) {
+        Column(Modifier.fillMaxWidth().background(brush).padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Box(Modifier.size(42.dp).background(Color(0x22FFFFFF), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                Text(glyph, color = Color(0xFFC7F36B), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            }
+            Text(title, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Text(subtitle, color = Color(0xFFC2D0D3), style = MaterialTheme.typography.bodySmall, minLines = 2)
+            Text("باز کردن  ↗", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun WorkflowStep(number: String, title: String, subtitle: String, complete: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+        Surface(color = if (complete) Color(0xFFC7F36B) else Color(0xFF263543), shape = RoundedCornerShape(11.dp)) {
+            Text(number, modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                color = if (complete) Color(0xFF101711) else Color(0xFF9DB0B8), fontWeight = FontWeight.ExtraBold)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, color = Color(0xFFEAF0EB), fontWeight = FontWeight.SemiBold)
+            Text(subtitle, color = Color(0xFF8799A4), style = MaterialTheme.typography.bodySmall)
+        }
+        Text(if (complete) "✓" else "○", color = if (complete) Color(0xFFC7F36B) else Color(0xFF667783))
+    }
 }
 
 @Composable
 private fun FolderCard(title: String, uri: Uri?, count: Int?, subtitle: String, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(vertical = 5.dp).clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(18.dp)) {
+    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = Color(0xFF141E29)),
+        shape = RoundedCornerShape(19.dp)) {
         Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.SemiBold)
-                Text(if (uri == null) subtitle else uri.lastPathSegment?.substringAfterLast(':') ?: "پوشه انتخاب شده",
-                    color = Color.LightGray, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (count != null) Text("$count تصویر شناسایی شد", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelMedium)
+            Box(Modifier.size(42.dp).background(Color(0xFF263A43), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
+                Text("▱", color = Color(0xFF8DE0D0), style = MaterialTheme.typography.titleLarge)
             }
-            Text(if (uri == null) "انتخاب +" else "تغییر", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, color = Color(0xFFF0F3EE), fontWeight = FontWeight.SemiBold)
+                Text(if (uri == null) subtitle else uri.lastPathSegment?.substringAfterLast(':') ?: "پوشه متصل",
+                    color = Color(0xFF8D9EAA), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (count != null) Text("$count تصویر شناسایی شد", color = Color(0xFFC7F36B), style = MaterialTheme.typography.labelSmall)
+            }
+            Text(if (uri == null) "اتصال +" else "تغییر", color = Color(0xFFC7F36B), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
         }
     }
 }
