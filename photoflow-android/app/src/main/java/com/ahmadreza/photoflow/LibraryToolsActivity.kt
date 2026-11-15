@@ -78,8 +78,9 @@ private object LibraryOps {
             require(file.mime.startsWith("image/")) { "فایل «${file.name}» تصویر نیست." }
             val source = resolve(context, file.root, file.path) ?: error("فایل پیدا نشد: ${file.name}")
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            context.contentResolver.openInputStream(source.uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            val boundsStream = context.contentResolver.openInputStream(source.uri)
                 ?: error("خواندن تصویر ناموفق بود: ${file.name}")
+            boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
             require(bounds.outWidth > 0 && bounds.outHeight > 0) { "تصویر «${file.name}» قابل رمزگشایی نیست." }
             val sample = calculateSample(bounds.outWidth, bounds.outHeight)
             val options = BitmapFactory.Options().apply { inSampleSize = sample }
