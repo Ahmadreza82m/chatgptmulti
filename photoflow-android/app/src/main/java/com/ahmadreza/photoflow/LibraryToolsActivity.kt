@@ -176,7 +176,9 @@ private object LibraryOps {
         completed
     }
 
-    private fun calculateSample(width: Int, height: Int): Int {        var sample = 1        while (width / sample > 4096 || height / sample > 4096) sample *= 2
+    private fun calculateSample(width: Int, height: Int): Int {
+        var sample = 1
+        while (width / sample > 2048 || height / sample > 2048) sample *= 2
         return sample
     }
 
