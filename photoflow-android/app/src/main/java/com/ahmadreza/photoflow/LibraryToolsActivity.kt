@@ -158,6 +158,8 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
     var files by remember { mutableStateOf<List<LibraryFile>>(emptyList()) }
     var selected by remember { mutableStateOf(setOf<String>()) }
     var favoriteKeys by remember { mutableStateOf(prefs.getStringSet("library_favorites", emptySet()).orEmpty()) }
+    var markedKeys by remember { mutableStateOf(prefs.getStringSet("library_marked", emptySet()).orEmpty()) }
+    var markedOnly by remember { mutableStateOf(false) }
     var categories by remember { mutableStateOf(prefs.getStringSet("library_categories", setOf("بدون دسته")).orEmpty().toList().sorted()) }
     var search by remember { mutableStateOf("") }
     var tagSearch by remember { mutableStateOf("") }
@@ -176,7 +178,6 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
     var outputFormat by remember { mutableStateOf("jpg") }
     var quality by remember { mutableIntStateOf(82) }
     var destinationExpanded by remember { mutableStateOf(false) }
-
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
@@ -211,7 +212,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
         val categoryMatches = categoryFilter == "همه دسته‌ها" || prefs.getString("category:${encodeKey(file.key)}", "بدون دسته") == categoryFilter
         val tags = prefs.getStringSet("tags:${encodeKey(file.key)}", emptySet()).orEmpty()
         val tagMatches = tagSearch.isBlank() || tags.any { it.contains(tagSearch, true) }
-        typeMatches && categoryMatches && tagMatches && (!largeFilesOnly || file.size >= 10L * 1024L * 1024L) && (!favoritesOnly || file.key in favoriteKeys) &&
+        typeMatches && categoryMatches && tagMatches && (!largeFilesOnly || file.size >= 10L * 1024L * 1024L) && (!favoritesOnly || file.key in favoriteKeys) && (!markedOnly || file.key in markedKeys) &&
             (search.isBlank() || file.name.contains(search, true) || file.path.contains(search, true))
     }
     val imageFiles = files.filter { it.mime.startsWith("image/") }
@@ -247,6 +248,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text("فضای فایل‌های تو", color = Color(0xFFB9B4FF), style = MaterialTheme.typography.labelLarge)
                                 Text("${files.size} فایل شناسایی‌شده", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+                Text("${markedKeys.size} فایل علامت‌گذاری‌شده", color = Color(0xFF9B8CFF), style = MaterialTheme.typography.labelMedium)
                                 Text("بدون تغییر در فایل‌های اصلی؛ ابزارها روی نسخه خروجی کار می‌کنند.", color = Color(0xFFD0D1E0), style = MaterialTheme.typography.bodySmall)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     MetricTile("تصاویر", imageFiles.size.toString(), Modifier.weight(1f))
@@ -282,6 +284,8 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         FilterChip(selected = favoritesOnly, onClick = { favoritesOnly = !favoritesOnly }, label = { Text("★ علاقه‌مندی‌ها") })
+                        Spacer(Modifier.width(6.dp))
+                        FilterChip(selected = markedOnly, onClick = { markedOnly = !markedOnly }, label = { Text("⚑ علامت‌گذاری‌شده‌ها") })
                         Spacer(Modifier.width(6.dp))
                         FilterChip(selected = largeFilesOnly, onClick = { largeFilesOnly = !largeFilesOnly }, label = { Text("بیش از ۱۰ مگابایت") })
                         Spacer(Modifier.width(8.dp))
@@ -343,6 +347,7 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                         file = file,
                         selected = file.key in selected,
                         favorite = file.key in favoriteKeys,
+                        marked = file.key in markedKeys,
                         category = prefs.getString("category:${encodeKey(file.key)}", "بدون دسته") ?: "بدون دسته",
                         categories = categories,
                         tags = prefs.getStringSet("tags:${encodeKey(file.key)}", emptySet()).orEmpty(),
@@ -351,13 +356,16 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                             favoriteKeys = if (file.key in favoriteKeys) favoriteKeys - file.key else favoriteKeys + file.key
                             prefs.edit().putStringSet("library_favorites", favoriteKeys).apply()
                         },
+                        onMarked = {
+                            markedKeys = if (file.key in markedKeys) markedKeys - file.key else markedKeys + file.key
+                            prefs.edit().putStringSet("library_marked", markedKeys).apply()
+                        },
                         onCategory = { cat -> prefs.edit().putString("category:${encodeKey(file.key)}", cat).apply(); status = "دسته فایل به «$cat» تغییر کرد." },
                         onTags = {
                             tagTarget = file
                             tagText = prefs.getStringSet("tags:${encodeKey(file.key)}", emptySet()).orEmpty().joinToString(", ")
                         }
-                    )
-                }
+                    )                }
                 item {
                     Text(status, color = Color(0xFFAAA8BE), style = MaterialTheme.typography.bodySmall)
                     Text("آمار: ${imageFiles.size} تصویر • ${files.count { it.mime.startsWith("video/") }} ویدئو • ${favoriteCount} علاقه‌مندی",
@@ -449,8 +457,8 @@ private fun MetricTile(title: String, value: String, modifier: Modifier = Modifi
 
 @Composable
 private fun LibraryFileCard(
-    file: LibraryFile, selected: Boolean, favorite: Boolean, category: String, categories: List<String>, tags: Set<String>,
-    onSelect: (Boolean) -> Unit, onFavorite: () -> Unit, onCategory: (String) -> Unit, onTags: () -> Unit
+    file: LibraryFile, selected: Boolean, favorite: Boolean, marked: Boolean, category: String, categories: List<String>, tags: Set<String>,
+    onSelect: (Boolean) -> Unit, onFavorite: () -> Unit, onMarked: () -> Unit, onCategory: (String) -> Unit, onTags: () -> Unit
 ) {
     var menu by remember { mutableStateOf(false) }
     Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF171A26))) {
@@ -462,6 +470,7 @@ private fun LibraryFileCard(
                     Text("${file.mime.ifBlank { "نوع نامشخص" }} • ${shortSize(file.size)}", color = Color(0xFFAAA8BE), style = MaterialTheme.typography.labelSmall)
                 }
                 IconButton(onClick = onFavorite) { Text(if (favorite) "★" else "☆", color = if (favorite) Color(0xFFFFCB70) else Color(0xFFAAA8BE)) }
+                IconButton(onClick = onMarked) { Text(if (marked) "⚑" else "⚐", color = if (marked) Color(0xFF9B8CFF) else Color(0xFFAAA8BE)) }
             }
             Text(file.path, color = Color(0xFF777D95), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
