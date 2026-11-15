@@ -280,7 +280,7 @@ private fun FileToolsScreen(onBack: () -> Unit) {
     }
 
     MaterialTheme(colorScheme = darkColorScheme()) {
-        Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { Text("بازگشت") }
                 Spacer(Modifier.width(8.dp))
