@@ -159,6 +159,8 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
     var favoriteKeys by remember { mutableStateOf(prefs.getStringSet("library_favorites", emptySet()).orEmpty()) }
     var categories by remember { mutableStateOf(prefs.getStringSet("library_categories", setOf("بدون دسته")).orEmpty().toList().sorted()) }
     var search by remember { mutableStateOf("") }
+    var tagSearch by remember { mutableStateOf("") }
+    var largeFilesOnly by remember { mutableStateOf(false) }
     var kind by remember { mutableStateOf(LibraryKind.ALL) }
     var favoritesOnly by remember { mutableStateOf(false) }
     var categoryFilter by remember { mutableStateOf("همه دسته‌ها") }
@@ -206,7 +208,9 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
             LibraryKind.OTHER -> !(file.mime.startsWith("image/") || file.mime.startsWith("video/") || file.mime.contains("pdf") || file.mime.contains("document") || file.mime.contains("text"))
         }
         val categoryMatches = categoryFilter == "همه دسته‌ها" || prefs.getString("category:${encodeKey(file.key)}", "بدون دسته") == categoryFilter
-        typeMatches && categoryMatches && (!favoritesOnly || file.key in favoriteKeys) &&
+        val tags = prefs.getStringSet("tags:${encodeKey(file.key)}", emptySet()).orEmpty()
+        val tagMatches = tagSearch.isBlank() || tags.any { it.contains(tagSearch, true) }
+        typeMatches && categoryMatches && tagMatches && (!largeFilesOnly || file.size >= 10L * 1024L * 1024L) && (!favoritesOnly || file.key in favoriteKeys) &&
             (search.isBlank() || file.name.contains(search, true) || file.path.contains(search, true))
     }
     val imageFiles = files.filter { it.mime.startsWith("image/") }
@@ -265,6 +269,10 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color(0xFF9B8CFF), unfocusedBorderColor = Color(0xFF34384B)))
                 }
                 item {
+                    OutlinedTextField(value = tagSearch, onValueChange = { tagSearch = it }, modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("فیلتر بر اساس برچسب ذخیره‌شده…") }, singleLine = true, shape = RoundedCornerShape(14.dp))
+                }
+                item {
                     Text("فیلترهای سریع", fontWeight = FontWeight.Bold)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                         LibraryKind.values().forEach { item ->
@@ -272,7 +280,9 @@ private fun LibraryToolsScreen(onBack: () -> Unit) {
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        FilterChip(selected = favoritesOnly, onClick = { favoritesOnly = !favoritesOnly }, label = { Text("★ فقط علاقه‌مندی‌ها") })
+                        FilterChip(selected = favoritesOnly, onClick = { favoritesOnly = !favoritesOnly }, label = { Text("★ علاقه‌مندی‌ها") })
+                        Spacer(Modifier.width(6.dp))
+                        FilterChip(selected = largeFilesOnly, onClick = { largeFilesOnly = !largeFilesOnly }, label = { Text("بیش از ۱۰ مگابایت") })
                         Spacer(Modifier.width(8.dp))
                         var catExpanded by remember { mutableStateOf(false) }
                         Box {
