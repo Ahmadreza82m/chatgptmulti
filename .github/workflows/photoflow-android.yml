@@ -1,7 +1,7 @@
 name: PhotoFlow Android Build
 on:
   push:
-    branches: [ "photo-flow-android" ]
+    branches: [ "photo-flow-android", "photo-flow-ultimate" ]
     paths:
       - "photoflow-android/**"
       - ".github/workflows/photoflow-android.yml"
