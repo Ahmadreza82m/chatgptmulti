@@ -281,11 +281,17 @@ private fun MatchCard(match: SuggestedMatch, originals: List<PhotoFile>, onAssig
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(match.photo.name, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(when (level) {
-                    MatchLevel.HIGH -> "شباهت زیاد · فاصله ${match.score?.distance}"
-                    MatchLevel.REVIEW -> "نیازمند بررسی · فاصله ${match.score?.distance}"
-                    else -> "تطبیق خودکار پیدا نشد"
+                Text(when {
+                    level == MatchLevel.HIGH -> "شباهت زیاد · فاصله ${match.score?.distance}"
+                    level == MatchLevel.REVIEW -> "نیازمند بررسی دستی · فاصله ${match.score?.distance}"
+                    match.score?.distance != null && match.score.distance <= 18 &&
+                        (match.score.margin ?: 99) < 3 -> "چند عکس تقریباً مشابه‌اند؛ انتخاب دستی لازم است"
+                    else -> "شباهت کافی پیدا نشد؛ انتخاب دستی لازم است"
                 }, color = tint, style = MaterialTheme.typography.labelSmall)
+                if (match.score?.runnerUpDistance != null) {
+                    Text("فاصله گزینه بعدی: ${match.score.runnerUpDistance} · اختلاف: ${match.score.margin}",
+                        color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
+                }
                 Box {
                     OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
                         Text(chosen?.name ?: "انتخاب عکس اصلی برای این خروجی", maxLines = 1, overflow = TextOverflow.Ellipsis)
