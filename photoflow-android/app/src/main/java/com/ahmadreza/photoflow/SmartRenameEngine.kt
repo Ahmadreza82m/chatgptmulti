@@ -28,6 +28,7 @@ object SmartRenameEngine {
         // Remove common leading counters / export prefixes, but preserve meaningful words.
         val prefixes = listOf(
             Regex("^\\s*\\d{1,6}\\s*[-_.،:)]\\s*"),
+            Regex("^\\s*\\d{1,6}\\s+"),
             Regex("^\\s*\\(\\d{1,6}\\)\\s*"),
             Regex("^\\s*(?:copy|copie|کپی)\\s*[-_ ]*\\d*\\s*[-_ ]*", RegexOption.IGNORE_CASE)
         )
@@ -78,6 +79,8 @@ object SmartRenameEngine {
 
             if (ext.isNotBlank() && !pattern.contains("{ext}") && !result.endsWith(".$ext", true)) {
                 result += ".$ext"
+            } else if (ext.isBlank()) {
+                result = result.removeSuffix(".")
             }
             require(result.isNotBlank() && result != ".$ext") { "نام نهایی یکی از فایل‌ها خالی است." }
             RenameItem(oldName, parentPath, result)
@@ -106,6 +109,7 @@ object SmartRenameEngine {
             .replace(Regex("\\s+"), " ")
             .trim()
         if (ext.isNotBlank() && !pattern.contains("{ext}") && !result.endsWith(".$ext", true)) result += ".$ext"
+        else if (ext.isBlank()) result = result.removeSuffix(".")
         return result
     }
 }
